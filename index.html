@@ -1,111 +1,221 @@
 <!DOCTYPE html>
 <html lang="hu">
 <head>
-<meta charset="UTF-8">
-<title>Focis Mini Játék</title>
+<meta charset="UTF-8" />
+<title>Focis Mini Játék – Irányítható lövés</title>
 <style>
   body {
     background: #6ab04c;
-    font-family: sans-serif;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     text-align: center;
     margin: 0;
     overflow: hidden;
   }
   canvas {
-    background: #6ab04c;
+    background: #4caf50;
     display: block;
     margin: 0 auto;
     border: 4px solid white;
+    box-shadow: 0 0 10px #3a7d2e;
+    cursor: crosshair;
   }
   h1 {
     color: white;
-    text-shadow: 2px 2px #333;
+    text-shadow: 2px 2px 5px #27411e;
+    margin-top: 10px;
   }
 </style>
 </head>
 <body>
-<h1>⚽ Büntetőrúgás!</h1>
+<h1>⚽ Büntetőrúgás – Több helyről, irányítható lövés</h1>
 <canvas id="gameCanvas" width="800" height="500"></canvas>
 <script>
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 
-let kapusX = 350;
-let kapusSeb = 3;
+let kapusX = 375;
+let kapusSeb = 4;
+let pont = 0;
+
 let labdaX = 400;
 let labdaY = 450;
 let labdaMozog = false;
-let pont = 0;
 
-// Játék rajzolása
-function rajzol() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+let celX = 400;
+let celY = 100;
+let labdaSeb = 12;
 
-  // Kapu
-  ctx.fillStyle = "white";
-  ctx.fillRect(300, 50, 200, 10);
-  ctx.fillRect(300, 50, 10, 100);
-  ctx.fillRect(490, 50, 10, 100);
+// Pálya rajzolása
+function rajzolPalya() {
+  ctx.fillStyle = '#4caf50';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  // Kapus
-  ctx.fillStyle = "blue";
-  ctx.fillRect(kapusX, 90, 50, 50);
+  ctx.strokeStyle = 'white';
+  ctx.lineWidth = 4;
 
-  // Labda
   ctx.beginPath();
-  ctx.arc(labdaX, labdaY, 15, 0, Math.PI * 2);
-  ctx.fillStyle = "white";
-  ctx.fill();
+  ctx.moveTo(300, 50);
+  ctx.lineTo(500, 50);
+  ctx.lineTo(500, 150);
+  ctx.lineTo(300, 150);
+  ctx.closePath();
   ctx.stroke();
 
-  // Pontszám
-  ctx.fillStyle = "white";
-  ctx.font = "20px Arial";
-  ctx.fillText("Pont: " + pont, 20, 30);
+  ctx.beginPath();
+  ctx.moveTo(300, 150);
+  ctx.lineTo(500, 150);
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.arc(400, 150, 100, Math.PI, 2 * Math.PI);
+  ctx.stroke();
+}
+
+// Kapuháló rajzolása
+function rajzolKapuhalo() {
+  ctx.strokeStyle = '#ccc';
+  ctx.lineWidth = 1;
+
+  for (let x = 300; x <= 500; x += 20) {
+    ctx.beginPath();
+    ctx.moveTo(x, 50);
+    ctx.lineTo(x, 150);
+    ctx.stroke();
+  }
+
+  for (let y = 50; y <= 150; y += 20) {
+    ctx.beginPath();
+    ctx.moveTo(300, y);
+    ctx.lineTo(500, y);
+    ctx.stroke();
+  }
+}
+
+// Kapus rajzolása
+function rajzolKapus(x, y) {
+  ctx.fillStyle = '#f5c9a3';
+  ctx.beginPath();
+  ctx.arc(x + 25, y + 15, 15, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#222';
+  ctx.stroke();
+
+  ctx.fillStyle = 'blue';
+  ctx.fillRect(x + 10, y + 30, 30, 50);
+
+  ctx.fillStyle = '#0055cc';
+  ctx.fillRect(x, y + 30, 10, 40);
+  ctx.fillRect(x + 40, y + 30, 10, 40);
+
+  ctx.fillStyle = '#222';
+  ctx.fillRect(x + 10, y + 80, 12, 30);
+  ctx.fillRect(x + 28, y + 80, 12, 30);
+}
+
+// Labda rajzolása árnyékkal
+function rajzolLabda(x, y) {
+  let gradient = ctx.createRadialGradient(x - 5, y - 5, 5, x, y, 15);
+  gradient.addColorStop(0, 'white');
+  gradient.addColorStop(1, '#888');
+  ctx.fillStyle = gradient;
+  ctx.beginPath();
+  ctx.arc(x, y, 15, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#444';
+  ctx.stroke();
+
+  ctx.fillStyle = 'black';
+  ctx.beginPath();
+  ctx.moveTo(x - 7, y - 5);
+  ctx.lineTo(x - 2, y + 2);
+  ctx.lineTo(x + 2, y - 2);
+  ctx.closePath();
+  ctx.fill();
+}
+
+// Pontszám és instrukciók megjelenítése
+function rajzolSzoveg() {
+  ctx.fillStyle = 'white';
+  ctx.font = "24px Arial";
+  ctx.fillText("Pont: " + pont, 20, 40);
+  ctx.font = "18px Arial";
+  ctx.fillText("Kattints a pálya alján a labda helyéhez, mozgasd az egeret az irányhoz, majd nyomj SPACE-t a lövéshez.", 20, 480);
 }
 
 // Kapus mozgás
 function kapusMozgas() {
   kapusX += kapusSeb;
-  if (kapusX <= 300 || kapusX >= 450) {
-    kapusSeb *= -1;
-  }
+  if (kapusX <= 300 || kapusX >= 450) kapusSeb *= -1;
 }
 
 // Labda mozgás
-function labdaMozgas() {
+function labdaMozgasFunc() {
   if (labdaMozog) {
-    labdaY -= 5;
-    // Ütközés a kapussal
-    if (labdaY <= 140 && labdaX > kapusX && labdaX < kapusX + 50) {
+    let dx = celX - labdaX;
+    let dy = celY - labdaY;
+    let tav = Math.sqrt(dx * dx + dy * dy);
+    if (tav < labdaSeb) {
+      // Elérte a célpontot, ellenőrizzük, hogy gól-e
       labdaMozog = false;
+      // Gól, ha a labda átlépi a kapuvonalat a kapu szélességén belül
+      if (labdaY <= 150 && labdaX >= 300 && labdaX <= 500) {
+        pont++;
+        alert("GÓÓÓL! 🎉");
+      } else {
+        alert("Nem sikerült!");
+      }
+      labdaX = 400;
       labdaY = 450;
-      alert("Védés! 😢");
-    }
-    // Gól
-    else if (labdaY <= 50) {
-      pont++;
-      labdaMozog = false;
-      labdaY = 450;
-      alert("GÓÓÓL! 🎉");
+      celX = 400;
+      celY = 100;
+    } else {
+      labdaX += (dx / tav) * labdaSeb;
+      labdaY += (dy / tav) * labdaSeb;
     }
   }
 }
 
-// Fő ciklus
-function jatek() {
-  kapusMozgas();
-  labdaMozgas();
-  rajzol();
-  requestAnimationFrame(jatek);
-}
-
-// Lövés kattintással
-canvas.addEventListener("click", () => {
+canvas.addEventListener("click", (e) => {
   if (!labdaMozog) {
+    let rect = canvas.getBoundingClientRect();
+    let clickX = e.clientX - rect.left;
+    let clickY = e.clientY - rect.top;
+    if (clickY > 400) {  // csak a pálya alján lehet helyet választani
+      labdaX = clickX;
+      labdaY = clickY;
+      celX = clickX;
+      celY = clickY - 350;
+    }
+  }
+});
+
+canvas.addEventListener("mousemove", (e) => {
+  if (!labdaMozog) {
+    let rect = canvas.getBoundingClientRect();
+    celX = e.clientX - rect.left;
+    celY = e.clientY - rect.top;
+  }
+});
+
+window.addEventListener("keydown", (e) => {
+  if (e.code === "Space" && !labdaMozog) {
     labdaMozog = true;
   }
 });
+
+function jatek() {
+  rajzolPalya();
+  rajzolKapuhalo();
+  rajzolKapus(kapusX, 90);
+  rajzolLabda(labdaX, labdaY);
+
+  rajzolSzoveg();
+
+  kapusMozgas();
+  labdaMozgasFunc();
+
+  requestAnimationFrame(jatek);
+}
 
 jatek();
 </script>
