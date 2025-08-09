@@ -2,7 +2,7 @@
 <html lang="hu">
 <head>
 <meta charset="UTF-8" />
-<title>Focis Mini Játék – Irányítható lövés</title>
+<title>Focis Mini Játék – Mobilbarát</title>
 <style>
   body {
     background: #6ab04c;
@@ -24,11 +24,30 @@
     text-shadow: 2px 2px 5px #27411e;
     margin-top: 10px;
   }
+  #loGomb {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 15px 30px;
+    font-size: 20px;
+    background: #007bff;
+    color: white;
+    border: none;
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    user-select: none;
+    z-index: 10;
+    touch-action: manipulation;
+  }
 </style>
 </head>
 <body>
 <h1>⚽ Büntetőrúgás – Több helyről, irányítható lövés</h1>
 <canvas id="gameCanvas" width="800" height="500"></canvas>
+
+<button id="loGomb">Lőj!</button>
+
 <script>
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
@@ -139,7 +158,7 @@ function rajzolSzoveg() {
   ctx.font = "24px Arial";
   ctx.fillText("Pont: " + pont, 20, 40);
   ctx.font = "18px Arial";
-  ctx.fillText("Kattints a pálya alján a labda helyéhez, mozgasd az egeret az irányhoz, majd nyomj SPACE-t a lövéshez.", 20, 480);
+  ctx.fillText("Kattints a pálya alján a labda helyéhez, mozgasd az egeret az irányhoz, majd nyomj SPACE-t vagy a gombot a lövéshez.", 20, 480);
 }
 
 // Kapus mozgás
@@ -157,7 +176,6 @@ function labdaMozgasFunc() {
     if (tav < labdaSeb) {
       // Elérte a célpontot, ellenőrizzük, hogy gól-e
       labdaMozog = false;
-      // Gól, ha a labda átlépi a kapuvonalat a kapu szélességén belül
       if (labdaY <= 150 && labdaX >= 300 && labdaX <= 500) {
         pont++;
         alert("GÓÓÓL! 🎉");
@@ -180,7 +198,7 @@ canvas.addEventListener("click", (e) => {
     let rect = canvas.getBoundingClientRect();
     let clickX = e.clientX - rect.left;
     let clickY = e.clientY - rect.top;
-    if (clickY > 400) {  // csak a pálya alján lehet helyet választani
+    if (clickY > 400) {
       labdaX = clickX;
       labdaY = clickY;
       celX = clickX;
@@ -194,6 +212,13 @@ canvas.addEventListener("mousemove", (e) => {
     let rect = canvas.getBoundingClientRect();
     celX = e.clientX - rect.left;
     celY = e.clientY - rect.top;
+  }
+});
+
+const loGomb = document.getElementById("loGomb");
+loGomb.addEventListener("click", () => {
+  if (!labdaMozog) {
+    labdaMozog = true;
   }
 });
 
