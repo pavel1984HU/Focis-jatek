@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+<meta charset="UTF-8">
+<title>Focis Mini Játék</title>
+<style>
+  body {
+    background: #6ab04c;
+    font-family: sans-serif;
+    text-align: center;
+    margin: 0;
+    overflow: hidden;
+  }
+  canvas {
+    background: #6ab04c;
+    display: block;
+    margin: 0 auto;
+    border: 4px solid white;
+  }
+  h1 {
+    color: white;
+    text-shadow: 2px 2px #333;
+  }
+</style>
+</head>
+<body>
+<h1>⚽ Büntetőrúgás!</h1>
+<canvas id="gameCanvas" width="800" height="500"></canvas>
+<script>
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+
+let kapusX = 350;
+let kapusSeb = 3;
+let labdaX = 400;
+let labdaY = 450;
+let labdaMozog = false;
+let pont = 0;
+
+// Játék rajzolása
+function rajzol() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Kapu
+  ctx.fillStyle = "white";
+  ctx.fillRect(300, 50, 200, 10);
+  ctx.fillRect(300, 50, 10, 100);
+  ctx.fillRect(490, 50, 10, 100);
+
+  // Kapus
+  ctx.fillStyle = "blue";
+  ctx.fillRect(kapusX, 90, 50, 50);
+
+  // Labda
+  ctx.beginPath();
+  ctx.arc(labdaX, labdaY, 15, 0, Math.PI * 2);
+  ctx.fillStyle = "white";
+  ctx.fill();
+  ctx.stroke();
+
+  // Pontszám
+  ctx.fillStyle = "white";
+  ctx.font = "20px Arial";
+  ctx.fillText("Pont: " + pont, 20, 30);
+}
+
+// Kapus mozgás
+function kapusMozgas() {
+  kapusX += kapusSeb;
+  if (kapusX <= 300 || kapusX >= 450) {
+    kapusSeb *= -1;
+  }
+}
+
+// Labda mozgás
+function labdaMozgas() {
+  if (labdaMozog) {
+    labdaY -= 5;
+    // Ütközés a kapussal
+    if (labdaY <= 140 && labdaX > kapusX && labdaX < kapusX + 50) {
+      labdaMozog = false;
+      labdaY = 450;
+      alert("Védés! 😢");
+    }
+    // Gól
+    else if (labdaY <= 50) {
+      pont++;
+      labdaMozog = false;
+      labdaY = 450;
+      alert("GÓÓÓL! 🎉");
+    }
+  }
+}
+
+// Fő ciklus
+function jatek() {
+  kapusMozgas();
+  labdaMozgas();
+  rajzol();
+  requestAnimationFrame(jatek);
+}
+
+// Lövés kattintással
+canvas.addEventListener("click", () => {
+  if (!labdaMozog) {
+    labdaMozog = true;
+  }
+});
+
+jatek();
+</script>
+</body>
+</html>
