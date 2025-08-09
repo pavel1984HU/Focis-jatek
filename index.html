@@ -2,7 +2,7 @@
 <html lang="hu">
 <head>
 <meta charset="UTF-8" />
-<title>Focis Mini Játék – Mobilbarát</title>
+<title>Focis Mini Játék – Mobilbarát + Animált Szignó</title>
 <style>
   body {
     background: #6ab04c;
@@ -40,6 +40,20 @@
     z-index: 10;
     touch-action: manipulation;
   }
+  #signature {
+    position: fixed;
+    bottom: 10px;
+    right: 10px;
+    font-size: 14px;
+    color: rgba(255,255,255,0.6);
+    font-style: italic;
+    user-select: none;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 1s ease-in-out;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    text-shadow: 0 0 3px rgba(0,0,0,0.5);
+  }
 </style>
 </head>
 <body>
@@ -47,6 +61,8 @@
 <canvas id="gameCanvas" width="800" height="500"></canvas>
 
 <button id="loGomb">Lőj!</button>
+
+<div id="signature">© Adrián</div>
 
 <script>
 const canvas = document.getElementById("gameCanvas");
@@ -227,6 +243,21 @@ window.addEventListener("keydown", (e) => {
     labdaMozog = true;
   }
 });
+
+// Animált szignó vezérlés
+const signature = document.getElementById("signature");
+let opacity = 0;
+let direction = 1; // 1: növekszik, -1: csökken
+
+function animateSignature() {
+  opacity += direction * 0.02;
+  if (opacity >= 0.6) direction = -1;
+  if (opacity <= 0) direction = 1;
+  signature.style.opacity = opacity;
+  requestAnimationFrame(animateSignature);
+}
+
+animateSignature();
 
 function jatek() {
   rajzolPalya();
