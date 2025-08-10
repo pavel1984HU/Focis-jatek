@@ -1,279 +1,389 @@
 <!DOCTYPE html>
 <html lang="hu">
 <head>
-<meta charset="UTF-8" />
-<title>Focis Mini Játék – Mobilbarát + Animált Szignó</title>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Focis Mini Játék – Majdnem kész verzió</title>
 <style>
-  body {
-    background: #6ab04c;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    text-align: center;
-    margin: 0;
-    overflow: hidden;
+  :root{
+    --green:#4caf50; --accent:#007bff;
   }
-  canvas {
-    background: #4caf50;
-    display: block;
-    margin: 0 auto;
-    border: 4px solid white;
-    box-shadow: 0 0 10px #3a7d2e;
-    cursor: crosshair;
-  }
-  h1 {
-    color: white;
-    text-shadow: 2px 2px 5px #27411e;
-    margin-top: 10px;
-  }
-  #loGomb {
-    position: fixed;
-    bottom: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-    padding: 15px 30px;
-    font-size: 20px;
-    background: #007bff;
-    color: white;
-    border: none;
-    border-radius: 10px;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-    user-select: none;
-    z-index: 10;
-    touch-action: manipulation;
-  }
-  #signature {
-    position: fixed;
-    bottom: 10px;
-    right: 10px;
-    font-size: 14px;
-    color: rgba(255,255,255,0.6);
-    font-style: italic;
-    user-select: none;
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity 1s ease-in-out;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    text-shadow: 0 0 3px rgba(0,0,0,0.5);
+  body{margin:0;font-family:Segoe UI, Tahoma, Geneva, Verdana, sans-serif;background:#6ab04c;display:flex;flex-direction:column;align-items:center;min-height:100vh;}
+  h1{color:white;margin:10px 0;text-shadow:2px 2px 5px #27411e}
+  #gameWrap{position:relative;max-width:900px;width:95%;}
+  canvas{width:100%;height:auto;display:block;border:4px solid white;box-shadow:0 0 10px #3a7d2e;background:var(--green);}
+  #controls{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin:10px 0;}
+  button,select{padding:8px 12px;font-size:16px;border-radius:8px;border:none;background:white;cursor:pointer}
+  #loGomb{background:var(--accent);color:white;font-weight:600;box-shadow:0 4px 8px rgba(0,0,0,0.15)}
+  #stats{color:white;text-align:left;margin-top:8px}
+  #signature{position:fixed;right:10px;bottom:10px;font-size:14px;color:rgba(255,255,255,0.8);font-style:italic;pointer-events:none;opacity:0;text-shadow:0 0 3px rgba(0,0,0,0.5)}
+  /* small screen tweaks */
+  @media(max-width:520px){
+    h1{font-size:18px}
+    button,select{font-size:15px;padding:10px}
   }
 </style>
 </head>
 <body>
-<h1>⚽ Büntetőrúgás – Több helyről, irányítható lövés</h1>
-<canvas id="gameCanvas" width="800" height="500"></canvas>
+<h1>⚽ Büntetőrúgás – Majdnem kész</h1>
+<div id="gameWrap">
+  <canvas id="gameCanvas" width="900" height="500"></canvas>
+</div>
 
-<button id="loGomb">Lőj!</button>
+<div id="controls">
+  <button id="loGomb">Lőj!</button>
+  <button id="startBtn">Start (normál)</button>
+  <button id="startTimerBtn">60s kihívás</button>
+  <label style="display:flex;align-items:center;gap:6px;background:transparent;color:white;">
+    <span style="color:white">Labda:</span>
+    <select id="ballSelect">
+      <option value="classic">Fehér</option>
+      <option value="red">Piros</option>
+      <option value="blue">Kék</option>
+    </select>
+  </label>
+  <div style="display:flex;flex-direction:column;align-items:flex-start;color:white;">
+    <div id="levelTxt">Szint: 1</div>
+    <div id="scoreTxt">Pont: 0 — Rekord: 0</div>
+    <div id="timeTxt"></div>
+  </div>
+</div>
 
 <div id="signature">© Adrián</div>
 
 <script>
-const canvas = document.getElementById("gameCanvas");
-const ctx = canvas.getContext("2d");
+/* ====== ÁLLAPOTOK ====== */
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+let width = canvas.width;
+let height = canvas.height;
+
+let kapuLeft = 300, kapuRight = 500, kapuTop = 50, kapuBottom = 150;
 
 let kapusX = 375;
-let kapusSeb = 4;
+let kapusY = 90;
+let kapusWidth = 50;
+let kapusHeight = 50;
+let baseKapusSpeed = 4;
+let kapusSpeed = baseKapusSpeed;
+
 let pont = 0;
+let szint = 1;
+const maxSzint = 5;
 
-let labdaX = 400;
-let labdaY = 450;
+let labda = {x:400,y:450,r:15,skin:'classic'};
+let cel = {x:400,y:100};
 let labdaMozog = false;
+let labdaSpeed = 12;
 
-let celX = 400;
-let celY = 100;
-let labdaSeb = 12;
+let showGuide = true;
 
-// Pálya rajzolása
-function rajzolPalya() {
+// timer mode
+let timerMode = false;
+let timeLeft = 0;
+let timerRunning = false;
+
+// localStorage highscore
+const HS_KEY = 'foci_highscore_v1';
+let highScore = parseInt(localStorage.getItem(HS_KEY)) || 0;
+
+// UI elemek
+const loGomb = document.getElementById('loGomb');
+const startBtn = document.getElementById('startBtn');
+const startTimerBtn = document.getElementById('startTimerBtn');
+const ballSelect = document.getElementById('ballSelect');
+const levelTxt = document.getElementById('levelTxt');
+const scoreTxt = document.getElementById('scoreTxt');
+const timeTxt = document.getElementById('timeTxt');
+const signature = document.getElementById('signature');
+
+/* ====== HANG (WebAudio egyszerű) ====== */
+const audioCtx = (window.AudioContext||window.webkitAudioContext)();
+function playBeep(freq, duration=0.12, type='sine', vol=0.08){
+  if(!audioCtx) return;
+  const o = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  o.type = type; o.frequency.value = freq;
+  g.gain.value = vol;
+  o.connect(g); g.connect(audioCtx.destination);
+  o.start();
+  o.stop(audioCtx.currentTime + duration);
+}
+
+/* ====== RAJZOLÓ FÜGGVÉNYEK ====== */
+function rajzolPalya(){
+  // háttér
   ctx.fillStyle = '#4caf50';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  ctx.strokeStyle = 'white';
-  ctx.lineWidth = 4;
-
+  ctx.fillRect(0,0,width,height);
+  // kapu kerete
+  ctx.strokeStyle = 'white'; ctx.lineWidth = 4;
   ctx.beginPath();
-  ctx.moveTo(300, 50);
-  ctx.lineTo(500, 50);
-  ctx.lineTo(500, 150);
-  ctx.lineTo(300, 150);
+  ctx.moveTo(kapuLeft,kapuTop);
+  ctx.lineTo(kapuRight,kapuTop);
+  ctx.lineTo(kapuRight,kapuBottom);
+  ctx.lineTo(kapuLeft,kapuBottom);
   ctx.closePath();
   ctx.stroke();
-
-  ctx.beginPath();
-  ctx.moveTo(300, 150);
-  ctx.lineTo(500, 150);
-  ctx.stroke();
-
-  ctx.beginPath();
-  ctx.arc(400, 150, 100, Math.PI, 2 * Math.PI);
-  ctx.stroke();
+  // kapuvonal
+  ctx.beginPath(); ctx.moveTo(kapuLeft,kapuBottom); ctx.lineTo(kapuRight,kapuBottom); ctx.stroke();
+  // 16-os félkör
+  ctx.beginPath(); ctx.arc((kapuLeft+kapuRight)/2, kapuBottom, 100, Math.PI, 2*Math.PI); ctx.stroke();
 }
 
-// Kapuháló rajzolása
-function rajzolKapuhalo() {
-  ctx.strokeStyle = '#ccc';
-  ctx.lineWidth = 1;
-
-  for (let x = 300; x <= 500; x += 20) {
-    ctx.beginPath();
-    ctx.moveTo(x, 50);
-    ctx.lineTo(x, 150);
-    ctx.stroke();
-  }
-
-  for (let y = 50; y <= 150; y += 20) {
-    ctx.beginPath();
-    ctx.moveTo(300, y);
-    ctx.lineTo(500, y);
-    ctx.stroke();
-  }
+function rajzolKapuhalo(){
+  ctx.strokeStyle = '#ddd'; ctx.lineWidth = 1;
+  for(let x=kapuLeft;x<=kapuRight;x+=20){ ctx.beginPath(); ctx.moveTo(x,kapuTop); ctx.lineTo(x,kapuBottom); ctx.stroke(); }
+  for(let y=kapuTop;y<=kapuBottom;y+=20){ ctx.beginPath(); ctx.moveTo(kapuLeft,y); ctx.lineTo(kapuRight,y); ctx.stroke(); }
 }
 
-// Kapus rajzolása
-function rajzolKapus(x, y) {
+function rajzolKapus(){
+  // árnyék
+  ctx.fillStyle = 'rgba(0,0,0,0.15)';
+  ctx.fillRect(kapusX+6,kapusY+kapusHeight+6,kapusWidth,10);
+  // fej
   ctx.fillStyle = '#f5c9a3';
-  ctx.beginPath();
-  ctx.arc(x + 25, y + 15, 15, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = '#222';
-  ctx.stroke();
-
-  ctx.fillStyle = 'blue';
-  ctx.fillRect(x + 10, y + 30, 30, 50);
-
-  ctx.fillStyle = '#0055cc';
-  ctx.fillRect(x, y + 30, 10, 40);
-  ctx.fillRect(x + 40, y + 30, 10, 40);
-
-  ctx.fillStyle = '#222';
-  ctx.fillRect(x + 10, y + 80, 12, 30);
-  ctx.fillRect(x + 28, y + 80, 12, 30);
+  ctx.beginPath(); ctx.arc(kapusX+25,kapusY+15,15,0,Math.PI*2); ctx.fill(); ctx.strokeStyle='#222'; ctx.stroke();
+  // test
+  ctx.fillStyle = '#1e88e5'; ctx.fillRect(kapusX+10,kapusY+30,30,50);
+  // karok
+  ctx.fillStyle = '#1565c0'; ctx.fillRect(kapusX,kapusY+30,10,40); ctx.fillRect(kapusX+40,kapusY+30,10,40);
+  // lábak
+  ctx.fillStyle = '#222'; ctx.fillRect(kapusX+10,kapusY+80,12,30); ctx.fillRect(kapusX+28,kapusY+80,12,30);
 }
 
-// Labda rajzolása árnyékkal
-function rajzolLabda(x, y) {
-  let gradient = ctx.createRadialGradient(x - 5, y - 5, 5, x, y, 15);
-  gradient.addColorStop(0, 'white');
-  gradient.addColorStop(1, '#888');
-  ctx.fillStyle = gradient;
-  ctx.beginPath();
-  ctx.arc(x, y, 15, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = '#444';
-  ctx.stroke();
-
+function rajzolLabda(){
+  // skin
+  let grad = ctx.createRadialGradient(labda.x-5,labda.y-5,5,labda.x,labda.y,labda.r);
+  if(labda.skin==='classic'){
+    grad.addColorStop(0,'#fff'); grad.addColorStop(1,'#aaa');
+  } else if(labda.skin==='red'){
+    grad.addColorStop(0,'#ffcdd2'); grad.addColorStop(1,'#b71c1c');
+  } else {
+    grad.addColorStop(0,'#bbdefb'); grad.addColorStop(1,'#0d47a1');
+  }
+  ctx.fillStyle = grad;
+  ctx.beginPath(); ctx.arc(labda.x,labda.y,labda.r,0,Math.PI*2); ctx.fill();
+  ctx.strokeStyle = '#444'; ctx.stroke();
+  // pici minta
   ctx.fillStyle = 'black';
-  ctx.beginPath();
-  ctx.moveTo(x - 7, y - 5);
-  ctx.lineTo(x - 2, y + 2);
-  ctx.lineTo(x + 2, y - 2);
-  ctx.closePath();
-  ctx.fill();
+  ctx.beginPath(); ctx.moveTo(labda.x-labda.r/2,labda.y-labda.r/3); ctx.lineTo(labda.x-labda.r/6,labda.y+2); ctx.lineTo(labda.x+labda.r/6,labda.y-labda.r/6); ctx.closePath(); ctx.fill();
 }
 
-// Pontszám és instrukciók megjelenítése
-function rajzolSzoveg() {
-  ctx.fillStyle = 'white';
-  ctx.font = "24px Arial";
-  ctx.fillText("Pont: " + pont, 20, 40);
-  ctx.font = "18px Arial";
-  ctx.fillText("Kattints a pálya alján a labda helyéhez, mozgasd az egeret az irányhoz, majd nyomj SPACE-t vagy a gombot a lövéshez.", 20, 480);
+function rajzolGuide(){
+  if(!showGuide || labdaMozog) return;
+  ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(labda.x,labda.y); ctx.lineTo(cel.x,cel.y); ctx.stroke();
+  // kis nyíl a célon
+  ctx.fillStyle = 'rgba(255,255,255,0.9)';
+  ctx.beginPath(); ctx.arc(cel.x,cel.y,6,0,Math.PI*2); ctx.fill();
 }
 
-// Kapus mozgás
-function kapusMozgas() {
-  kapusX += kapusSeb;
-  if (kapusX <= 300 || kapusX >= 450) kapusSeb *= -1;
+function rajzolHUD(){
+  ctx.fillStyle = 'white'; ctx.font = '20px Arial';
+  ctx.fillText('Pont: '+pont, 20, 34);
+  ctx.fillText('Szint: '+szint, 20, 60);
 }
 
-// Labda mozgás
-function labdaMozgasFunc() {
-  if (labdaMozog) {
-    let dx = celX - labdaX;
-    let dy = celY - labdaY;
-    let tav = Math.sqrt(dx * dx + dy * dy);
-    if (tav < labdaSeb) {
-      // Elérte a célpontot, ellenőrizzük, hogy gól-e
-      labdaMozog = false;
-      if (labdaY <= 150 && labdaX >= 300 && labdaX <= 500) {
-        pont++;
-        alert("GÓÓÓL! 🎉");
-      } else {
-        alert("Nem sikerült!");
-      }
-      labdaX = 400;
-      labdaY = 450;
-      celX = 400;
-      celY = 100;
+/* ====== JÁTÉKLOGIKA ====== */
+function kapusMozg(){
+  kapusX += kapusSpeed;
+  if(kapusX <= kapuLeft || kapusX + kapusWidth >= kapuRight) kapusSpeed *= -1;
+}
+
+function labdaMozgasFunc(){
+  if(!labdaMozog) return;
+  let dx = cel.x - labda.x;
+  let dy = cel.y - labda.y;
+  let dist = Math.hypot(dx,dy);
+  if(dist < labdaSpeed){
+    // elérte a cél
+    labdaMozog = false;
+    // ellenőrzés: ha labdaY <= kapuBottom && labdaX belül kapuLeft..kapuRight és labda áthaladt a kapuvonalon (y<=kapuBottom)
+    if(labda.y <= kapuBottom && labda.x >= kapuLeft && labda.x <= kapuRight){
+      pont++;
+      playBeep(880,0.12,'sine',0.12); // gól hang
+      checkLevelUp();
+      saveHighScore();
     } else {
-      labdaX += (dx / tav) * labdaSeb;
-      labdaY += (dy / tav) * labdaSeb;
+      playBeep(220,0.08,'triangle',0.06); // kudarc hang
     }
+    // reset labda pozíció vissza a közép alá
+    labda.x = width/2; labda.y = height - 50;
+    cel.x = labda.x; cel.y = labda.y - 350;
+  } else {
+    labda.x += (dx/dist)*labdaSpeed;
+    labda.y += (dy/dist)*labdaSpeed;
   }
 }
 
-canvas.addEventListener("click", (e) => {
-  if (!labdaMozog) {
-    let rect = canvas.getBoundingClientRect();
-    let clickX = e.clientX - rect.left;
-    let clickY = e.clientY - rect.top;
-    if (clickY > 400) {
-      labdaX = clickX;
-      labdaY = clickY;
-      celX = clickX;
-      celY = clickY - 350;
-    }
+function checkLevelUp(){
+  // minden 5 pont után szintlépés
+  if(pont>0 && pont % 5 === 0 && szint < maxSzint){
+    szint++;
+    kapusSpeed = (baseKapusSpeed + szint - 1) * (Math.random()>0.5?1: -1);
+    // kis jutalom hang
+    playBeep(1320,0.10,'sine',0.09);
+    alert('Átmentél a '+szint+'. szintre — szerencsés továbbhaladás!');
+  }
+}
+
+function saveHighScore(){
+  if(pont > highScore){
+    highScore = pont;
+    localStorage.setItem(HS_KEY, highScore);
+  }
+  scoreTxt.textContent = `Pont: ${pont} — Rekord: ${highScore}`;
+}
+
+/* ====== INPUTKEZELÉS (egér/érintés) ====== */
+function getCanvasPos(e){
+  const rect = canvas.getBoundingClientRect();
+  let clientX = e.clientX ?? (e.touches && e.touches[0].clientX);
+  let clientY = e.clientY ?? (e.touches && e.touches[0].clientY);
+  return {x: clientX - rect.left, y: clientY - rect.top};
+}
+
+canvas.addEventListener('click',(e)=>{
+  if(labdaMozog) return;
+  const p = getCanvasPos(e);
+  // csak a pálya alján (y > height - 120) engedjük a labda helyválasztást
+  if(p.y > height - 120){
+    labda.x = p.x; labda.y = p.y; cel.x = p.x; cel.y = p.y - 350;
+    playBeep(520,0.06,'sine',0.06);
   }
 });
 
-canvas.addEventListener("mousemove", (e) => {
-  if (!labdaMozog) {
-    let rect = canvas.getBoundingClientRect();
-    celX = e.clientX - rect.left;
-    celY = e.clientY - rect.top;
-  }
+canvas.addEventListener('mousemove',(e)=>{
+  if(labdaMozog) return;
+  const p = getCanvasPos(e);
+  cel.x = p.x; cel.y = p.y;
 });
 
-const loGomb = document.getElementById("loGomb");
-loGomb.addEventListener("click", () => {
-  if (!labdaMozog) {
-    labdaMozog = true;
+/* érintés támogatás (mobile) - touchmove és touchstart */
+canvas.addEventListener('touchstart',(e)=>{ e.preventDefault(); const p=getCanvasPos(e); if(!labdaMozog && p.y>height-120){ labda.x=p.x; labda.y=p.y; cel.x=p.x; cel.y=p.y-350; } }, {passive:false});
+canvas.addEventListener('touchmove',(e)=>{ e.preventDefault(); const p=getCanvasPos(e); if(!labdaMozog){ cel.x=p.x; cel.y=p.y; } }, {passive:false});
+
+/* lövés: gomb és Space */
+loGomb.addEventListener('click',()=>{ if(!labdaMozog){ labdaMozog=true; playBeep(660,0.06,'square',0.07); } });
+window.addEventListener('keydown',(e)=>{ if(e.code==='Space' && !labdaMozog){ labdaMozog=true; playBeep(660,0.06,'square',0.07); } });
+
+/* startok */
+startBtn.addEventListener('click',()=>{ resetRound(false); });
+startTimerBtn.addEventListener('click',()=>{ resetRound(true); });
+
+function resetRound(useTimer){
+  // reset alapok
+  pont = 0; szint = 1; kapusSpeed = baseKapusSpeed;
+  labda.x = width/2; labda.y = height-50; labdaMozog=false; cel.x = labda.x; cel.y = labda.y-350;
+  saveHighScore();
+  timerMode = useTimer;
+  if(timerMode){
+    timeLeft = 60; timerRunning = true; playTimerTick();
+  } else { timeLeft = 0; timerRunning = false; timeTxt.textContent = ''; }
+}
+
+/* egyszerű timer tick */
+function playTimerTick(){
+  if(!timerMode) return;
+  timeTxt.textContent = `Idő: ${timeLeft}s`;
+  if(timeLeft<=0){
+    timerRunning=false;
+    alert('Idő lejárt! Pont: '+pont);
+    saveHighScore();
+    return;
   }
-});
+  setTimeout(()=>{ timeLeft--; playTimerTick(); }, 1000);
+}
 
-window.addEventListener("keydown", (e) => {
-  if (e.code === "Space" && !labdaMozog) {
-    labdaMozog = true;
-  }
-});
+/* labda skin választás */
+ballSelect.addEventListener('change',(e)=>{ labda.skin = e.target.value; });
 
-// Animált szignó vezérlés
-const signature = document.getElementById("signature");
-let opacity = 0;
-let direction = 1; // 1: növekszik, -1: csökken
+/* highscore init */
+scoreTxt.textContent = `Pont: ${pont} — Rekord: ${highScore}`;
 
-function animateSignature() {
-  opacity += direction * 0.02;
-  if (opacity >= 0.6) direction = -1;
-  if (opacity <= 0) direction = 1;
-  signature.style.opacity = opacity;
+/* ====== ANIMÁLT SZIGNÓ (pulzál) ====== */
+let sigOp = 0, sigDir = 1;
+function animateSignature(){
+  sigOp += sigDir * 0.02;
+  if(sigOp >= 0.7) sigDir = -1;
+  if(sigOp <= 0) sigDir = 1;
+  signature.style.opacity = sigOp;
   requestAnimationFrame(animateSignature);
 }
-
 animateSignature();
 
-function jatek() {
-  rajzolPalya();
-  rajzolKapuhalo();
-  rajzolKapus(kapusX, 90);
-  rajzolLabda(labdaX, labdaY);
-
-  rajzolSzoveg();
-
-  kapusMozgas();
+/* ====== FŐ CIKLUS ====== */
+function update(){
+  // canvas méretezés (ha responsive)
+  if(canvas.clientWidth !== width){
+    // skálázzuk a belső felbontást az arány megtartásához
+    const ratio = canvas.clientWidth / canvas.width;
+  }
+  // logika
+  kapusMozg();
+  if(timerMode && timerRunning){
+    // ha timer megy, a kapus slightly faster
+  }
   labdaMozgasFunc();
 
-  requestAnimationFrame(jatek);
+  // frissítések a HUD-ból
+  levelTxt.textContent = `Szint: ${szint}`;
+  scoreTxt.textContent = `Pont: ${pont} — Rekord: ${highScore}`;
 }
 
-jatek();
+/* RAJZ ciklus */
+function render(){
+  // méret beolvasás (rendben tartása)
+  width = canvas.width = canvas.clientWidth * (window.devicePixelRatio || 1);
+  height = canvas.height = 500 * (window.devicePixelRatio || 1);
+  // beállítjuk a transform freeze (nem szükséges most)
+  // rajzolás
+  ctx.save();
+  // skálázás vissza a logikai koordinátákhoz (rajzolunk 900x500 arányban)
+  ctx.scale((canvas.clientWidth)/(900), (canvas.clientWidth)/(900)); // egyszerű arány
+  // tisztítás
+  ctx.clearRect(0,0,900,500);
+  // pálya elemek
+  rajzolPalya();
+  rajzolKapuhalo();
+  // kapus és labda pozíciók azért kezeljük arányosan: használjuk a logikai koordinátákat
+  // (a egyszerűség kedvéért ebben a verzióban a logika 900x500 koordinátákat használ)
+  ctx.setTransform(1,0,0,1,0,0); // reset transzform
+  // Normál rajzolás a logikai koordinátákon:
+  // (újra) tisztít
+  ctx.clearRect(0,0,900,500);
+  rajzolPalya();
+  rajzolKapuhalo();
+  // kapus (használjuk logikai koordinátákat)
+  // ha a canvas tényleges mérete nagyobb, a következő rajzok arányosak maradnak mert a canvas most 900x500 logikai
+  // kapus rajzolása
+  ctx.save();
+  // kapus pozicionálása a logikai koordináták szerint
+  ctx.translate(0,0);
+  // rajzoljuk a kapust a kapusX, kapusY alapján
+  // (kapusX, kapusY itt logikai értékek)
+  // draw with same functions but they assume canvas is 900x500
+  rajzolKapus(kapusX, kapusY);
+  // labda és guide and HUD
+  rajzolLabda();
+  rajzolGuide();
+  rajzolHUD();
+  ctx.restore();
+  requestAnimationFrame(render);
+}
+
+/* egyszerű update loop külön */
+setInterval(update, 1000/30); // 30 FPS update
+render();
+
+/* ====== EGYÉB SEGÉD ====== */
+/* autosave highscore when window unload */
+window.addEventListener('beforeunload', ()=>{ localStorage.setItem(HS_KEY, highScore); });
+
+/* Kezdő beállítás */
+resetRound(false);
 </script>
 </body>
 </html>
