@@ -382,14 +382,6 @@ init();
 </script>
 
 <!-- Service worker regisztráció (PWA) — V3 + cache-buster -->
-<script>
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./service-worker-v3.js?v=5', { scope: './' })
-        .then(reg => console.log('SW reg ok (v3):', reg.scope))
-        .catch(err => console.warn('SW reg hiba:', err));
-    });
-  }
-</script>
+
 </body>
 </html>
