@@ -110,7 +110,7 @@ const keeper={x:375,y:90,w:60,h:60,vx:4,diveT:0,targetX:null,reactDelay:0};
 
 /* Power-upok */
 const powerups=[]; const PU_TYPES=['SUPER','SLOW','WIDE'];
-function spawnPowerUp(){ if(Math.random()<0.5) return; const type=PU_TYPES[Math.floor(Math.random()*PU_TYPES.length)]; powerups.push({ x: 260+Math.random()*380, y: 240+Math.random()*180, type, t: 600 }); }
+function spawnPowerUp(){ if(Math.random()<0.01 && powerups.length<2){ const type=PU_TYPES[Math.floor(Math.random()*PU_TYPES.length)]; powerups.push({ x: 260+Math.random()*380, y: 240+Math.random()*180, type, t: 600 }); } }
 let wideTimer=0, slowTimer=0;
 
 /* Hangok (WebAudio) */
@@ -179,7 +179,12 @@ function stepWeather(){
   if(weather==='rain'){ rain.forEach(d=>{ d.x-=0.8; d.y+=d.vy; if(d.y>H){ d.y=-10; d.x=Math.random()*W; } }); }
   else if(weather==='snow'){ snow.forEach(s=>{ s.x+=s.vx; s.y+=s.vy; if(s.y>H){ s.y=-10; s.x=Math.random()*W; } }); }
 }
-function drawHUD(){ ctx.fillStyle='#fff'; ctx.font='20px Arial'; ctx.fillText(`Pont: ${score}`, 20, 34); ctx.fillText(`Szint: ${level}`, 20, 60); ctx.fillText('Verzió: v2-keeper', 760, 34);}
+function drawHUD(){
+  ctx.fillStyle='#fff'; ctx.font='20px Arial';
+  ctx.fillText(`Pont: ${score}`, 20, 34);
+  ctx.fillText(`Szint: ${level}`, 20, 60);
+  ctx.fillText('Verzió: v2-keeper', 740, 34); /* <<< VERZIÓ-JELZÉS */
+}
 
 /* Konfetti */
 function spawnConfetti(x,y,n=35){ for(let i=0;i<n;i++){ confetti.push({x,y,vx:rand(-3,3),vy:rand(-5,-1),g:rand(0.12,0.2),life:rand(30,60),c:`hsl(${Math.floor(Math.random()*360)} 90% 60%)`}); } }
@@ -338,7 +343,7 @@ function update(){
   if(shakeT>0) shakeT--;
   if(wideTimer>0) wideTimer--;
   if(slowTimer>0) slowTimer--;
-  if(Math.random()<0.01 && powerups.length<2) spawnPowerUp();
+  spawnPowerUp();
 }
 let shakeT=0, shakeMag=0;
 function render(){
@@ -354,12 +359,12 @@ function init(){ setupWeather(); resetRound(false); loop(); }
 init();
 </script>
 
-<!-- Service worker regisztráció (PWA) -->
+<!-- Service worker regisztráció (PWA) — V2 -->
 <script>
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
       navigator.serviceWorker.register('./service-worker-v2.js', { scope: './' })
-        .then(reg => console.log('SW reg ok:', reg.scope))
+        .then(reg => console.log('SW reg ok (v2):', reg.scope))
         .catch(err => console.warn('SW reg hiba:', err));
     });
   }
