@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>KickSpark • Focis Mini Játék (© Adrián)</title>
 
-<!-- Manifest maradhat, SW nélkül is ártalmatlan -->
+<!-- Manifest maradhat, SW nélkül is oké -->
 <link rel="manifest" href="./manifest.json">
 <meta name="theme-color" content="#4caf50">
 <link rel="icon" href="./icons/icon-192.png" sizes="192x192">
@@ -34,15 +34,16 @@
   #signature{position:fixed;right:10px;bottom:10px;font-size:14px;color:rgba(255,255,255,.85);font-style:italic;pointer-events:none;text-shadow:0 0 3px rgba(0,0,0,.5);animation:pulse 3s ease-in-out infinite}
   @keyframes pulse{0%{opacity:.1}50%{opacity:.75}100%{opacity:.1}}
   @media(max-width:520px){h1{font-size:18px} button,select,label{font-size:15px}}
+  #diag{position:fixed;left:8px;top:8px;background:#0008;color:#fff;padding:6px 8px;border-radius:6px;font:12px/1.2 Arial;z-index:9999}
 </style>
 </head>
 <body>
   <div id="wrap">
     <h1>⚽ KickSpark – Weather + PowerUps (© Adrián)
-  <small style="font-size:14px; margin-left:8px; opacity:.9; background:#fff2; padding:2px 6px; border-radius:6px;">
-    VERZIÓ: v3-keeper
-  </small>
-</h1>
+      <small style="font-size:14px; margin-left:8px; opacity:.9; background:#fff2; padding:2px 6px; border-radius:6px;">
+        VERZIÓ: v3-keeper
+      </small>
+    </h1>
     <div style="position:relative">
       <canvas id="game" width="900" height="500"></canvas>
       <div id="powerWrap"><div id="powerBar"></div></div>
@@ -71,6 +72,8 @@
     <div id="hint">Húzd vissza a labdát (drag) → engedd el. Hosszabb húzás = erősebb rúgás. 🎯</div>
   </div>
   <div id="signature">© Adrián</div>
+
+<div id="diag">Töltés…</div>
 
 <script>
 /* ===== Állapot és UI ===== */
@@ -349,11 +352,16 @@ function update(){
   if(slowTimer>0) slowTimer--;
   spawnPowerUp();
 }
-let shakeT=0, shakeMag=0;
 function render(){
   ctx.save();
-  if(shakeT>0){ ctx.translate((Math.random()*2-1)*6, (Math.random()*2-1)*6); }
-  drawField(); drawKeeper(); drawPowerUps(); drawBall(); drawGuide(); drawWeather(); drawConfetti(); drawHUD();
+  drawField();
+  drawKeeper();         /* FONTOS: kapus kirajzolása */
+  drawPowerUps();
+  drawBall();
+  drawGuide();
+  drawWeather();
+  drawConfetti();
+  drawHUD();
   ctx.restore();
 }
 function loop(){ update(); render(); requestAnimationFrame(loop); }
@@ -361,13 +369,12 @@ function loop(){ update(); render(); requestAnimationFrame(loop); }
 /* Indítás */
 function init(){ setupWeather(); resetRound(false); loop(); }
 init();
-<div id="diag" style="position:fixed;left:8px;top:8px;background:#0008;color:#fff;padding:6px 8px;border-radius:6px;font:12px/1.2 Arial;z-index:9999"></div>
-<script>
-  setInterval(()=>{ 
-    const ok = (typeof keeper!=='undefined') && keeper && typeof drawKeeper==='function';
-    document.getElementById('diag').textContent = 'Kapus kód: ' + (ok?'OK':'HIÁNYZIK');
-  }, 800);
-</script>
+
+/* Diagnosztika: jelezze, hogy a kapus kód él-e */
+setInterval(()=>{ 
+  const ok = (typeof keeper!=='undefined') && keeper && typeof drawKeeper==='function';
+  document.getElementById('diag').textContent = 'Kapus kód: ' + (ok?'OK':'HIÁNYZIK');
+}, 800);
 </script>
 
 <!-- NINCS service worker regisztráció -->
