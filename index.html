@@ -69,7 +69,7 @@
   <div id="signature">© Adrián</div>
 
 <script>
-/* ===== Állapot ===== */
+/* ===== Alap állapot ===== */
 const cvs = document.getElementById('game'); const ctx = cvs.getContext('2d');
 const W=cvs.width, H=cvs.height;
 const shootBtn=document.getElementById('shootBtn'), resetBtn=document.getElementById('resetBtn'), shareBtn=document.getElementById('shareBtn');
@@ -183,7 +183,7 @@ function drawHUD(){
   ctx.fillStyle='#fff'; ctx.font='20px Arial';
   ctx.fillText(`Pont: ${score}`, 20, 34);
   ctx.fillText(`Szint: ${level}`, 20, 60);
-  ctx.fillText('Verzió: v2-keeper', 740, 34); /* <<< VERZIÓ-JELZÉS */
+  ctx.fillText('Verzió: v3-keeper', 700, 34); /* <<< VERZIÓ-JELZÉS */
 }
 
 /* Konfetti */
@@ -359,12 +359,34 @@ function init(){ setupWeather(); resetRound(false); loop(); }
 init();
 </script>
 
-<!-- Service worker regisztráció (PWA) — V2 -->
+<!-- Egyszeri „kemény frissítés” — minden régi SW és cache törlése -->
+<script>
+  (async () => {
+    try {
+      if (!localStorage.getItem('ks_cache_cleared_v1')) {
+        if ('serviceWorker' in navigator) {
+          const regs = await navigator.serviceWorker.getRegistrations();
+          await Promise.all(regs.map(r => r.unregister()));
+        }
+        if (window.caches) {
+          const keys = await caches.keys();
+          await Promise.all(keys.map(k => caches.delete(k)));
+        }
+        localStorage.setItem('ks_cache_cleared_v1','1');
+        location.reload();
+      }
+    } catch (e) {
+      console.warn('Cache/SW törlés nem sikerült:', e);
+    }
+  })();
+</script>
+
+<!-- Service worker regisztráció (PWA) — V3 + cache-buster -->
 <script>
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./service-worker-v2.js?v=3', { scope: './' })
-        .then(reg => console.log('SW reg ok (v2):', reg.scope))
+      navigator.serviceWorker.register('./service-worker-v3.js?v=5', { scope: './' })
+        .then(reg => console.log('SW reg ok (v3):', reg.scope))
         .catch(err => console.warn('SW reg hiba:', err));
     });
   }
