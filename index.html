@@ -358,7 +358,7 @@ init();
 <script>
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./service-worker.js', { scope: './' })
+      navigator.serviceWorker.register('./service-worker-v2.js', { scope: './' })
         .then(reg => console.log('SW reg ok:', reg.scope))
         .catch(err => console.warn('SW reg hiba:', err));
     });
