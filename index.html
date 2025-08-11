@@ -361,6 +361,13 @@ function loop(){ update(); render(); requestAnimationFrame(loop); }
 /* Indítás */
 function init(){ setupWeather(); resetRound(false); loop(); }
 init();
+<div id="diag" style="position:fixed;left:8px;top:8px;background:#0008;color:#fff;padding:6px 8px;border-radius:6px;font:12px/1.2 Arial;z-index:9999"></div>
+<script>
+  setInterval(()=>{ 
+    const ok = (typeof keeper!=='undefined') && keeper && typeof drawKeeper==='function';
+    document.getElementById('diag').textContent = 'Kapus kód: ' + (ok?'OK':'HIÁNYZIK');
+  }, 800);
+</script>
 </script>
 
 <!-- NINCS service worker regisztráció -->
