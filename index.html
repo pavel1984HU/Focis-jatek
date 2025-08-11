@@ -3,7 +3,13 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Focis Mini Játék – Weather+PowerUps (© Adrián)</title>
+<title>KickSpark • Focis Mini Játék (© Adrián)</title>
+<link rel="manifest" href="./manifest.json">
+<meta name="theme-color" content="#4caf50">
+<link rel="icon" href="./icons/icon-192.png" sizes="192x192">
+<link rel="apple-touch-icon" href="./icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <style>
   :root{--green:#4caf50;--accent:#007bff;}
   *{box-sizing:border-box}
@@ -29,7 +35,7 @@
 </head>
 <body>
   <div id="wrap">
-    <h1>⚽ Büntetőrúgás – Weather + PowerUps (© Adrián)</h1>
+    <h1>⚽ KickSpark – Weather + PowerUps (© Adrián)</h1>
     <div style="position:relative">
       <canvas id="game" width="900" height="500"></canvas>
       <div id="powerWrap"><div id="powerBar"></div></div>
@@ -60,7 +66,7 @@
   <div id="signature">© Adrián</div>
 
 <script>
-/* ===== Alap állapot ===== */
+/* ===== Alap állapot (ugyanaz a Weather+PowerUps verzió) ===== */
 const cvs = document.getElementById('game'); const ctx = cvs.getContext('2d');
 const W=cvs.width, H=cvs.height;
 const shootBtn = document.getElementById('shootBtn');
@@ -75,7 +81,7 @@ const lvEl=document.getElementById('lv'), scEl=document.getElementById('sc'), hi
 const pBar=document.getElementById('powerBar');
 
 let score=0, level=1, maxLevel=5;
-const HS_KEY='foci_next_top5_hi_v1';
+const HS_KEY='kickspark_hi_v1';
 let hiscore=+localStorage.getItem(HS_KEY)||0; hiEl.textContent=hiscore;
 
 let mode='normal', timeLeft=0, timerOn=false;
@@ -88,14 +94,13 @@ let aim={x:ball.x, y:ball.y-350};
 let dragging=false, dragStart=null, power=0, powerMax=26;
 
 /* Szél (finom) */
-let wind = { x: 0.0 }; // vízszintes
-function randomizeWind(){ wind.x = (Math.random()*2-1) * (0.06 + level*0.01); } // szinttel picit nő
+let wind = { x: 0.0 };
+function randomizeWind(){ wind.x = (Math.random()*2-1) * (0.06 + level*0.01); }
 
-/* Közönség (háttér sorok) */
+/* Közönség */
 const crowd = new Array(60).fill(0).map((_,i)=>({
   x: Math.random()*W, y: 10+Math.random()*30, s: 0.5+Math.random()*0.8, c: `hsl(${Math.floor(Math.random()*360)} 70% 60%)`
 }));
-/* zászlók */
 const flags = [{x:120, y:35, t:0, c:'#ffd600'},{x:760, y:28, t:0, c:'#e91e63'}];
 
 /* Háló behajlás */
@@ -108,10 +113,10 @@ const confetti=[];
 const keeper={x:375,y:90,w:60,h:60,vx:4,diveT:0,targetX:null,reactDelay:0};
 
 /* Power-upok */
-const powerups=[]; // {x,y,type,t}
+const powerups=[];
 const PU_TYPES=['SUPER','SLOW','WIDE'];
 function spawnPowerUp(){
-  if(Math.random()<0.5) return; // nem mindig
+  if(Math.random()<0.5) return;
   const type = PU_TYPES[Math.floor(Math.random()*PU_TYPES.length)];
   powerups.push({ x: 260+Math.random()*380, y: 240+Math.random()*180, type, t: 600 });
 }
@@ -126,7 +131,7 @@ const sSave = ()=>bip(220,.10,'triangle',.10);
 const sLevel= ()=>bip(1200,.12,'sine',.09);
 const sPU   = ()=>bip(980,.08,'square',.08);
 
-/* Időjárás (rain/snow/sunny) */
+/* Időjárás */
 let weather='random';
 const rain=[], snow=[];
 function setupWeather(){
@@ -150,13 +155,12 @@ function circleRectCollide(cx,cy,cr, rx,ry,rw,rh){
   const dx=cx-nx, dy=cy-ny; return (dx*dx+dy*dy)<=cr*cr;
 }
 
-/* Rajz – pálya + közönség + időjárás */
+/* Rajzok */
 function drawCrowd(){
   crowd.forEach((p,i)=>{
     const y = p.y + Math.sin((performance.now()/400 + i)*p.s)*2;
     ctx.fillStyle=p.c; ctx.fillRect(p.x, y, 10, 10);
   });
-  // zászlók
   flags.forEach(f=>{
     f.t += 0.08;
     const wave = Math.sin(f.t)*6;
@@ -168,16 +172,13 @@ function drawCrowd(){
 function drawField(){
   ctx.fillStyle='#4caf50'; ctx.fillRect(0,0,W,H);
   drawCrowd();
-  // kapu keret
   const gl = kapu.left - (wideTimer>0?20:0);
   const gr = kapu.right + (wideTimer>0?20:0);
   ctx.strokeStyle='#fff'; ctx.lineWidth=4; ctx.strokeRect(gl, kapu.top, gr-gl, kapu.bottom-kapu.top);
-  // háló (behajlás)
   const sway = netKick*8;
   ctx.strokeStyle='#ddd'; ctx.lineWidth=1;
   for(let x=gl; x<=gr; x+=20){ ctx.beginPath(); ctx.moveTo(x, kapu.top); ctx.lineTo(x+sway*Math.sin((x-gl)/30), kapu.bottom); ctx.stroke(); }
   for(let y=kapu.top; y<=kapu.bottom; y+=20){ ctx.beginPath(); ctx.moveTo(gl, y); ctx.lineTo(gr, y + sway*Math.sin((y-kapu.top)/28)); ctx.stroke(); }
-  // 16-os félkör
   ctx.strokeStyle='#fff'; ctx.lineWidth=4; ctx.beginPath(); ctx.arc((gl+gr)/2, kapu.bottom, 100, Math.PI, 2*Math.PI); ctx.stroke();
 }
 function drawKeeper(){
@@ -227,9 +228,7 @@ function drawHUD(){
 }
 
 /* Konfetti */
-function spawnConfetti(x,y,n=35){
-  for(let i=0;i<n;i++){ confetti.push({x,y,vx:rand(-3,3),vy:rand(-5,-1),g:rand(0.12,0.2),life:rand(30,60),c:`hsl(${Math.floor(rand(0,360))} 90% 60%)`}); }
-}
+function spawnConfetti(x,y,n=35){ for(let i=0;i<n;i++){ confetti.push({x,y,vx:rand(-3,3),vy:rand(-5,-1),g:rand(0.12,0.2),life:rand(30,60),c:`hsl(${Math.floor(rand(0,360))} 90% 60%)`}); } }
 function stepConfetti(){ for(let i=confetti.length-1;i>=0;i--){ const p=confetti[i]; p.x+=p.vx; p.y+=p.vy; p.vy+=p.g; p.life--; if(p.life<=0) confetti.splice(i,1); } }
 function drawConfetti(){ confetti.forEach(p=>{ ctx.fillStyle=p.c; ctx.fillRect(p.x,p.y,4,4); }); }
 
@@ -247,7 +246,7 @@ function keeperAI(){
   if(Math.random()<0.01) keeper.vx*=(Math.random()<.5?0.7:1.3);
   if(keeper.reactDelay>0){ keeper.reactDelay--; return; }
   if(ball.moving && ball.y < 260 && keeper.diveT<=0){
-    keeper.reactDelay = Math.floor(rand(5,14));
+    keeper.reactDelay = Math.floor(Math.random()*9)+5;
     keeper.targetX = clamp(ball.x + rand(-40,40) - keeper.w/2, gl, gr-keeper.w);
     const speed = (slowTimer>0?0.6:1) * (4 + (level-1)*1.4);
     keeper.vx = (keeper.targetX > keeper.x ? 1:-1) * speed * 1.6;
@@ -258,7 +257,7 @@ function keeperAI(){
   keeper.vx = clamp(keeper.vx, -vmax*1.8, vmax*1.8);
 }
 
-/* Power-up rajz és lépés */
+/* Power-upok */
 function drawPowerUps(){
   powerups.forEach(p=>{
     ctx.save();
@@ -274,20 +273,18 @@ function stepPowerUps(){
   for(let i=powerups.length-1;i>=0;i--){
     powerups[i].t--;
     if(powerups[i].t<=0){ powerups.splice(i,1); continue; }
-    // felvétel: ha labda beleér
     if(circleRectCollide(ball.x,ball.y,ball.r, powerups[i].x-10, powerups[i].y-10, 20, 20)){
       const type = powerups[i].type;
       powerups.splice(i,1);
-      if(sndChk.checked) sPU();
+      if(AC && sndChk.checked) bip(980,.08,'square',.08);
       if(type==='SUPER'){ ball.super = true; setTimeout(()=>ball.super=false, 4000); }
-      if(type==='SLOW'){ slowTimer = 240; }      // ~4s
-      if(type==='WIDE'){ wideTimer = 240; }      // ~4s
+      if(type==='SLOW'){ slowTimer = 240; }
+      if(type==='WIDE'){ wideTimer = 240; }
     }
   }
 }
 
 /* Timer & szint/pont */
-let timeLeft=0, timerOn=false;
 function resetRound(startTimer=false){
   score=0; level=1; ball.moving=false; ball.super=false;
   ball.x=W/2; ball.y=H-60; aim.x=ball.x; aim.y=ball.y-350;
@@ -300,75 +297,68 @@ function resetRound(startTimer=false){
 }
 function tickTimer(){ if(!timerOn) return; tEl.textContent=`• Idő: ${timeLeft}s`; if(timeLeft<=0){ timerOn=false; alert(`⏱️ Idő lejárt! Pont: ${score}`); saveHi(); return; } setTimeout(()=>{ timeLeft--; tickTimer(); },1000); }
 function saveHi(){ if(score>hiscore){ hiscore=score; localStorage.setItem(HS_KEY, hiscore);} }
-function levelUp(){ if(score>0 && score%5===0 && level<maxLevel){ level++; if(sndChk.checked) sLevel(); alert(`Gratulálok! Szint ${level}.`); randomizeWind(); } }
+function levelUp(){ if(score>0 && score%5===0 && level<maxLevel){ level++; if(AC && sndChk.checked) bip(1200,.12,'sine',.09); alert(`Gratulálok! Szint ${level}.`); randomizeWind(); } }
 function updateStats(){ lvEl.textContent=level; scEl.textContent=score; hiEl.textContent=hiscore; }
 
-/* Labda léptetés + ütközések + szél */
+/* Labda */
 function stepBall(){
   if(!ball.moving) return;
-  ball.vx += wind.x * 0.05; // szél kicsit tolja
+  ball.vx += wind.x * 0.05;
   ball.x += ball.vx;
   ball.y += ball.vy;
-
-  // kapus ütközés (ha nincs SUPER)
   const gl = kapu.left - (wideTimer>0?20:0);
   const gr = kapu.right + (wideTimer>0?20:0);
   if(!ball.super && circleRectCollide(ball.x,ball.y,ball.r, keeper.x,keeper.y,keeper.w,keeper.h)){
-    ball.moving=false; if(sndChk.checked) sSave();
+    ball.moving=false; if(AC && sndChk.checked) bip(220,.10,'triangle',.10);
     ball.x=W/2; ball.y=H-60; aim.x=ball.x; aim.y=ball.y-350; return;
   }
-
-  // GÓL
   if(ball.y - ball.r <= kapu.top && ball.x >= gl && ball.x <= gr){
     ball.moving=false; score++; saveHi(); levelUp(); updateStats();
-    if(sndChk.checked) sGoal();
+    if(AC && sndChk.checked){ bip(880,.10,'sine',.10); setTimeout(()=>bip(1320,.08,'sine',.08),90); }
     netKick=1; spawnConfetti(ball.x, kapu.top+10, 35); startShake(12,6);
-    shareBtn.style.display='inline-block'; // megosztás engedélyezése
+    shareBtn.style.display='inline-block';
     ball.x=W/2; ball.y=H-60; aim.x=ball.x; aim.y=ball.y-350; return;
   }
-
-  // pálya elhagyás
   if(ball.y + ball.r < 0 || ball.y - ball.r > H || ball.x + ball.r < 0 || ball.x - ball.r > W){
-    ball.moving=false; if(sndChk.checked) sSave();
+    ball.moving=false; if(AC && sndChk.checked) bip(220,.10,'triangle',.10);
     ball.x=W/2; ball.y=H-60; aim.x=ball.x; aim.y=ball.y-350;
   }
 }
 
-/* Drag lövés + erőmérő */
+/* Drag lövés */
 function getPos(e){
   const r=cvs.getBoundingClientRect();
   const cx=(e.touches?e.touches[0].clientX:e.clientX)-r.left;
   const cy=(e.touches?e.touches[0].clientY:e.clientY)-r.top;
   return { x: cx*(cvs.width/r.width), y: cy*(cvs.height/r.height) };
 }
+let dragging=false, dragStart=null, power=0, powerMax=26;
 function startDrag(p){
   if(ball.moving) return;
   if(Math.hypot(p.x-ball.x,p.y-ball.y) <= ball.r+28){
-    dragging=true; dragStart={x:p.x,y:p.y}; power=0; updatePowerUI();
+    dragging=true; dragStart={x:p.x,y:p.y}; power=0; pBar.style.width='0%';
   } else if(p.y>H-120){
-    // labda hely kiválasztás
-    ball.x=p.x; ball.y=p.y; aim.x=ball.x; aim.y=ball.y-350; bip(520,.05,'sine',.06);
+    ball.x=p.x; ball.y=p.y; aim.x=ball.x; aim.y=ball.y-350; if(AC&&sndChk.checked) bip(520,.05,'sine',.06);
   }
 }
 function moveDrag(p){
   if(!dragging||ball.moving){ if(!ball.moving){ aim.x=p.x; aim.y=p.y; } return; }
   const dx=p.x-dragStart.x, dy=p.y-dragStart.y;
-  power = clamp(Math.hypot(dx,dy)/6, 0, powerMax);
+  power = Math.max(0, Math.min(26, Math.hypot(dx,dy)/6));
   const ang = Math.atan2(dy,dx)+Math.PI;
   const len = 180 * (power/powerMax);
   aim.x = ball.x + Math.cos(ang)*len;
   aim.y = ball.y + Math.sin(ang)*len;
-  updatePowerUI();
+  pBar.style.width = `${Math.round((power/powerMax)*100)}%`;
 }
 function endDrag(){
   if(!dragging) return; dragging=false;
   if(power<2) return;
   const dx=aim.x-ball.x, dy=aim.y-ball.y, d=Math.hypot(dx,dy)||1;
   const sp = 6 + (power/powerMax)*14;
-  ball.vx=(dx/d)*sp; ball.vy=(dy/d)*sp; ball.moving=true; if(sndChk.checked) sKick();
-  power=0; updatePowerUI();
+  ball.vx=(dx/d)*sp; ball.vy=(dy/d)*sp; ball.moving=true; if(AC&&sndChk.checked) bip(660,.06,'square',.09);
+  power=0; pBar.style.width='0%';
 }
-function updatePowerUI(){ pBar.style.width=`${Math.round((power/powerMax)*100)}%`; }
 
 /* Események */
 cvs.addEventListener('mousedown', e=>startDrag(getPos(e)));
@@ -378,28 +368,26 @@ cvs.addEventListener('touchstart', e=>{e.preventDefault();startDrag(getPos(e));}
 cvs.addEventListener('touchmove', e=>{e.preventDefault();moveDrag(getPos(e));},{passive:false});
 cvs.addEventListener('touchend', e=>{e.preventDefault();endDrag();},{passive:false});
 
-shootBtn.addEventListener('click', ()=>{ if(!ball.moving){ const dx=aim.x-ball.x, dy=aim.y-ball.y, d=Math.hypot(dx,dy)||1; const sp=14; ball.vx=(dx/d)*sp; ball.vy=(dy/d)*sp; ball.moving=true; if(sndChk.checked) sKick(); }});
+shootBtn.addEventListener('click', ()=>{ if(!ball.moving){ const dx=aim.x-ball.x, dy=aim.y-ball.y, d=Math.hypot(dx,dy)||1; const sp=14; ball.vx=(dx/d)*sp; ball.vy=(dy/d)*sp; ball.moving=true; if(AC&&sndChk.checked) bip(660,.06,'square',.09); }});
 window.addEventListener('keydown', e=>{ if(e.code==='Space' && !ball.moving) shootBtn.click(); });
 
 resetBtn.addEventListener('click', ()=>resetRound(modeSel.value==='timed'));
 modeSel.addEventListener('change', e=>resetRound(e.target.value==='timed'));
 weatherSel.addEventListener('change', setupWeather);
 
-/* Megosztás (Web Share API vagy vágólap) */
+/* Megosztás */
 shareBtn.addEventListener('click', async ()=>{
   const url = `${location.origin}${location.pathname}?score=${score}`;
-  const text = `Elértem ${score} pontot a focis mini játékban! ⚽`;
+  const text = `Elértem ${score} pontot a KickSpark-ban! ⚽`;
   if(navigator.share){
-    try{ await navigator.share({title:'Focis Mini Játék', text, url}); }catch(e){}
+    try{ await navigator.share({title:'KickSpark', text, url}); }catch(e){}
   } else {
-    try{
-      await navigator.clipboard.writeText(url);
-      alert('Link vágólapra másolva! ✨');
-    }catch(e){ alert(url); }
+    try{ await navigator.clipboard.writeText(url); alert('Link vágólapra másolva! ✨'); } catch(e){ alert(url); }
   }
 });
 
-/* Update & Render */
+/* Loop */
+let shakeT=0, shakeMag=0;
 function update(){
   keeperAI();
   stepBall();
@@ -410,7 +398,6 @@ function update(){
   if(shakeT>0) shakeT--;
   if(wideTimer>0) wideTimer--;
   if(slowTimer>0) slowTimer--;
-  // ritkán power-up
   if(Math.random()<0.01 && powerups.length<2) spawnPowerUp();
 }
 function render(){
@@ -428,9 +415,20 @@ function render(){
 }
 function loop(){ update(); render(); requestAnimationFrame(loop); }
 
-/* Init */
+/* Indítás */
 function init(){ setupWeather(); resetRound(false); loop(); }
 init();
+</script>
+
+<script>
+  // Service Worker regisztráció PWA-hoz
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./service-worker.js', { scope: './' })
+        .then(reg => console.log('SW reg ok:', reg.scope))
+        .catch(err => console.warn('SW reg hiba:', err));
+    });
+  }
 </script>
 </body>
 </html>
