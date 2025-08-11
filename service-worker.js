@@ -1,5 +1,5 @@
 // service-worker.js
-const CACHE_NAME = 'kickspark-v1';
+const CACHE_NAME = 'kickspark-v2';
 const APP_SHELL = [
   './',
   './index.html',
