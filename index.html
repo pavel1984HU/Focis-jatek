@@ -25,6 +25,7 @@
   button{cursor:pointer}
   #shootBtn{background:var(--accent);color:#fff;font-weight:600;box-shadow:0 4px 10px rgba(0,0,0,.2)}
   #resetBtn{background:#fff;color:#333}
+  #saveBtn{background:#8e24aa;color:#fff;display:none}
   #shareBtn{background:#00bfa5;color:#fff;display:none}
   #stats{font-size:15px;opacity:.95}
   #panel{background:#ffffff1a;border:1px solid #ffffff33;border-radius:10px;padding:6px 10px;display:flex;gap:10px;align-items:center}
@@ -38,32 +39,47 @@
     #controls button,#controls select,#controls label{padding:12px 16px;font-size:17px}
     #powerWrap{left:8px;bottom:8px;width:65%}
   }
-  /* Banner (gól/védés) */
   #banner{position:absolute;left:50%;top:12%;transform:translateX(-50%);
     padding:8px 14px;background:#000a;color:#fff;border-radius:10px;backdrop-filter:blur(2px);
     font-weight:700;opacity:0;transition:opacity .2s, transform .2s;pointer-events:none}
+  #cup{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:.4s}
+  #cup.show{opacity:1}
+  #cup .box{background:#000a;color:#fff;padding:16px 20px;border-radius:14px;backdrop-filter:blur(2px);box-shadow:0 6px 24px rgba(0,0,0,.35)}
 </style>
 </head>
 <body>
   <div id="wrap">
-    <h1>⚽ KickSpark – Weather + PowerUps (© Adrián)
+    <h1>⚽ KickSpark – Targets + Combo + Pro Aim (© Adrián)
       <small style="font-size:14px; margin-left:8px; opacity:.9; background:#fff2; padding:2px 6px; border-radius:6px;">
-        VERZIÓ: v4-pwa
+        VERZIÓ: v8-targets-combo-aim
       </small>
     </h1>
+
     <div style="position:relative">
       <canvas id="game" width="900" height="500"></canvas>
       <div id="powerWrap"><div id="powerBar"></div></div>
       <div id="banner">GOOOL! 🎉</div>
+      <div id="cup"><div class="box">🏆 <b>Bajnok vagy!</b> – érintsd meg az újraindításhoz</div></div>
     </div>
 
     <div id="controls">
       <button id="shootBtn" title="Rúgás (Space)">Lőj!</button>
       <button id="resetBtn">Újrakezd</button>
+
       <select id="modeSel" title="Mód">
         <option value="normal">Normál</option>
         <option value="timed">60s kihívás</option>
+        <option value="champ">Bajnokság</option>
+        <option value="targets">Céltáblás</option>
       </select>
+
+      <select id="shotSel" title="Lövés típusa">
+        <option value="normal">Normál</option>
+        <option value="curve">Csavart</option>
+        <option value="knuckle">Knuckle</option>
+        <option value="bounce">Pattogós</option>
+      </select>
+
       <select id="weatherSel" title="Időjárás">
         <option value="sunny">Napos</option>
         <option value="rain">Eső</option>
@@ -71,25 +87,47 @@
         <option value="random" selected>Véletlen</option>
       </select>
 
-      <!-- Nehézség csúszka -->
+      <!-- Stadion/kapus -->
+      <select id="stadiumSel" title="Stadion">
+        <option value="classic" selected>Klasszikus</option>
+        <option value="city">Városi</option>
+        <option value="beach">Tengerpart</option>
+        <option value="snowfield">Havas</option>
+        <option value="nightpro">Pro éjszaka</option>
+      </select>
+      <select id="keeperSel" title="Kapus skin">
+        <option value="blue" selected>Kék</option>
+        <option value="red">Piros</option>
+        <option value="neon">Neon zöld</option>
+        <option value="purple">Lila</option>
+        <option value="retro">Retro sárga</option>
+      </select>
+
       <label style="display:flex;gap:6px;align-items:center">
         Nehézség
         <input id="diff" type="range" min="1" max="5" step="1" value="3" style="width:120px">
       </label>
 
-      <!-- Hang ki/be -->
+      <label style="display:flex;gap:6px;align-items:center">
+        Éjszakai mód
+        <input id="night" type="checkbox">
+      </label>
+
       <button id="muteBtn" title="Hang ki/be">🔊</button>
 
-      <span id="stats">Szint: <b id="lv">1</b> • Pont: <b id="sc">0</b> • Rekord: <b id="hi">0</b> <span id="tLeft"></span></span>
+      <span id="stats">Szint: <b id="lv">1</b> • Pont: <b id="sc">0</b> • Rekord: <b id="hi">0</b> • <b id="comboTxt">Kombó x1</b> <span id="tLeft"></span></span>
+
       <div id="panel">
         <label><input type="checkbox" id="snd" checked> Hang</label>
         <label><input type="checkbox" id="shake" checked> Rázkódás</label>
         <label><input type="checkbox" id="guide" checked> Irányvonal</label>
+        <label><input type="checkbox" id="proGuide"> Pro irányvonal</label>
       </div>
+
       <button id="shareBtn">Megosztás</button>
     </div>
 
-    <div id="hint">Húzd vissza a labdát (drag) → engedd el. Hosszabb húzás = erősebb rúgás. 🎯</div>
+    <div id="hint">Húzd vissza a labdát → engedd el. Próbáld ki a <b>Céltáblás</b> módot! A <b>Pro irányvonal</b> előre jelzi az ívet (szél/spin). 🎯</div>
   </div>
   <div id="signature">© Adrián</div>
 
@@ -98,10 +136,12 @@
 const cvs = document.getElementById('game'); const ctx = cvs.getContext('2d');
 const W=cvs.width, H=cvs.height;
 const shootBtn=document.getElementById('shootBtn'), resetBtn=document.getElementById('resetBtn'), shareBtn=document.getElementById('shareBtn');
-const modeSel=document.getElementById('modeSel'), weatherSel=document.getElementById('weatherSel');
-const sndChk=document.getElementById('snd'), shakeChk=document.getElementById('shake'), guideChk=document.getElementById('guide');
-const lvEl=document.getElementById('lv'), scEl=document.getElementById('sc'), hiEl=document.getElementById('hi'), tEl=document.getElementById('tLeft');
-const pBar=document.getElementById('powerBar'); const diff=document.getElementById('diff'); const muteBtn=document.getElementById('muteBtn'); const banner=document.getElementById('banner');
+const modeSel=document.getElementById('modeSel'), weatherSel=document.getElementById('weatherSel'), shotSel=document.getElementById('shotSel');
+const stadiumSel=document.getElementById('stadiumSel'), keeperSel=document.getElementById('keeperSel');
+const sndChk=document.getElementById('snd'), shakeChk=document.getElementById('shake'), guideChk=document.getElementById('guide'), proGuide=document.getElementById('proGuide');
+const lvEl=document.getElementById('lv'), scEl=document.getElementById('sc'), hiEl=document.getElementById('hi'), tEl=document.getElementById('tLeft'), comboTxt=document.getElementById('comboTxt');
+const pBar=document.getElementById('powerBar'); const diff=document.getElementById('diff'); const muteBtn=document.getElementById('muteBtn');
+const banner=document.getElementById('banner'); const night=document.getElementById('night'); const cup=document.getElementById('cup');
 
 let score=0, level=1, maxLevel=5;
 const HS_KEY='kickspark_hi_v1';
@@ -111,14 +151,68 @@ let mode='normal', timeLeft=0, timerOn=false;
 
 const kapu={left:300, right:500, top:50, bottom:150};
 
-const ball={x:W/2, y:H-60, r:16, moving:false, vx:0, vy:0, super:false};
+const ball={x:W/2, y:H-60, r:16, moving:false, vx:0, vy:0, super:false, spin:0, type:'normal', bounces:0};
 let aim={x:ball.x, y:ball.y-350};
 
 let dragging=false, dragStart=null, power=0, powerMax=26;
 
-/* Szél (finom) */
+/* Kombó szorzó */
+let combo=0;
+function comboMult(){ return 1 + Math.min(2, Math.floor(combo/3)); } // 1x (0-2), 2x (3-5), 3x (6+)
+function resetCombo(){ combo=0; comboTxt.textContent=`Kombó x${comboMult()}`; }
+function successCombo(){ combo++; comboTxt.textContent=`Kombó x${comboMult()}`; }
+
+/* Targets mód */
+const targets=[];
+function spawnTargets(n=3){
+  targets.length=0;
+  const gl=kapu.left+14, gr=kapu.right-14, gt=kapu.top+14, gb=kapu.bottom-14;
+  for(let i=0;i<n;i++){
+    targets.push({
+      x: Math.random()*(gr-gl)+gl,
+      y: Math.random()*(gb-gt)+gt,
+      r: 10+Math.random()*8,
+      vx: (Math.random()<.5?-1:1)*(1.2+Math.random()*1.2),
+      vy: (Math.random()<.5?-1:1)*(0.6+Math.random()*0.8),
+      t: 0,
+      alive:true
+    });
+  }
+}
+function stepTargets(){
+  const gl=kapu.left+10, gr=kapu.right-10, gt=kapu.top+10, gb=kapu.bottom-10;
+  targets.forEach(t=>{
+    if(!t.alive) return;
+    t.x+=t.vx; t.y+=t.vy; t.t++;
+    if(t.x-t.r<gl || t.x+t.r>gr) t.vx*=-1;
+    if(t.y-t.r<gt || t.y+t.r>gb) t.vy*=-1;
+  });
+}
+function drawTargets(){
+  targets.forEach(t=>{
+    if(!t.alive) return;
+    const blink = (Math.sin(t.t/8)+1)/2; // 0..1
+    ctx.save();
+    ctx.lineWidth=3;
+    ctx.strokeStyle = `rgba(255,255,255,${0.9})`;
+    ctx.beginPath(); ctx.arc(t.x,t.y,t.r,0,Math.PI*2); ctx.stroke();
+    ctx.strokeStyle = `rgba(255,0,80,${0.8})`;
+    ctx.beginPath(); ctx.arc(t.x,t.y,t.r*0.65,0,Math.PI*2); ctx.stroke();
+    ctx.fillStyle = `rgba(255,255,255,${0.35+0.35*blink})`;
+    ctx.beginPath(); ctx.arc(t.x,t.y,2.2,0,Math.PI*2); ctx.fill();
+    ctx.restore();
+  });
+}
+
+/* Replay (marad a háttérben rögzítéshez) */
+const replay = { frames: [], playing:false, ptr:0, speed:0.35 };
+function replayCapture(){ if(!ball.moving) replay.frames.length=0; else if(replay.frames.length<240){ replay.frames.push({ bx:ball.x, by:ball.y, kx:keeper.x, ky:keeper.y }); } }
+function replayStart(){ if(replay.frames.length>3){ replay.playing=true; replay.ptr=0; } }
+function replayStop(){ replay.playing=false; }
+
+/* Szél */
 let wind = { x: 0.0 };
-function randomizeWind(){ wind.x = (Math.random()*2-1) * (0.06 + level*0.01); }
+function randomizeWind(){ wind.x = (Math.random()*2-1) * (0.08 + level*0.015); }
 
 /* Közönség + zászlók */
 const crowd = new Array(60).fill(0).map((_,i)=>({ x: Math.random()*W, y: 10+Math.random()*30, s: 0.5+Math.random()*0.8, c: `hsl(${Math.floor(Math.random()*360)} 70% 60%)` }));
@@ -148,8 +242,8 @@ let weather='random'; const rain=[], snow=[];
 function setupWeather(){
   let w=weatherSel.value; weather=(w==='random')?(['sunny','rain','snow'][Math.floor(Math.random()*3)]):w;
   rain.length=0; snow.length=0;
-  if(weather==='rain'){ for(let i=0;i<120;i++){ rain.push({x:Math.random()*W,y:Math.random()*H,vy:4+Math.random()*6}); } }
-  if(weather==='snow'){ for(let i=0;i<80;i++){ snow.push({x:Math.random()*W,y:Math.random()*H,vy:1+Math.random()*1.5,vx:(Math.random()*2-1)*0.5}); } }
+  if(weather==='rain'){ for(let i=0;i<140;i++){ rain.push({x:Math.random()*W,y:Math.random()*H,vy:5+Math.random()*7}); } }
+  if(weather==='snow'){ for(let i=0;i<90;i++){ snow.push({x:Math.random()*W,y:Math.random()*H,vy:1+Math.random()*1.5,vx:(Math.random()*2-1)*0.5}); } }
   randomizeWind();
 }
 
@@ -158,50 +252,126 @@ function clamp(n,a,b){ return Math.max(a, Math.min(b,n)); }
 function rand(a,b){ return a + Math.random()*(b-a); }
 function circleRectCollide(cx,cy,cr, rx,ry,rw,rh){ const nx=Math.max(rx,Math.min(cx,rx+rw)); const ny=Math.max(ry,Math.min(cy,ry+rh)); const dx=cx-nx, dy=cy-ny; return (dx*dx+dy*dy)<=cr*cr; }
 
+/* Trail a labdához */
+const trail=[];
+
+/* Stadion háttér (mint korábban) */
+function drawBackdrop(){
+  const s = stadiumSel.value;
+  const isNight = night.checked || s==='nightpro';
+  if(s==='beach'){
+    const sky=ctx.createLinearGradient(0,0,0,H*0.5);
+    sky.addColorStop(0,'#87CEEB'); sky.addColorStop(1,'#FFE0A3');
+    ctx.fillStyle=sky; ctx.fillRect(0,0,W,H);
+    ctx.fillStyle='rgba(255,255,255,.9)'; ctx.beginPath(); ctx.arc(W*0.85, H*0.18, 28, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle='rgba(0,0,0,.25)'; ctx.fillRect(80,70,6,30);
+    ctx.beginPath(); ctx.moveTo(83,70); for(let i=-3;i<=3;i++){ ctx.lineTo(83+i*12,50+Math.abs(i)*6); ctx.lineTo(83,70);} ctx.fill();
+  } else if(s==='city'){
+    const sky=ctx.createLinearGradient(0,0,0,H*0.6);
+    sky.addColorStop(0, isNight?'#1a237e':'#90caf9');
+    sky.addColorStop(1, isNight?'#0d133d':'#bbdefb');
+    ctx.fillStyle=sky; ctx.fillRect(0,0,W,H);
+    ctx.fillStyle=isNight?'#222':'#455a64';
+    for(let i=0;i<12;i++){ const x=i*(W/12)+rand(-8,8), w=W/14+rand(-6,14), h=rand(40,110); ctx.fillRect(x, H*0.30 - h, w, h); }
+  } else if(s==='snowfield'){
+    const sky=ctx.createLinearGradient(0,0,0,H*0.6); sky.addColorStop(0,'#e3f2fd'); sky.addColorStop(1,'#bbdefb'); ctx.fillStyle=sky; ctx.fillRect(0,0,W,H);
+  } else if(s==='nightpro'){
+    const sky=ctx.createLinearGradient(0,0,0,H*0.6); sky.addColorStop(0,'#0b1029'); sky.addColorStop(1,'#121a3a'); ctx.fillStyle=sky; ctx.fillRect(0,0,W,H);
+    for(let i=0;i<40;i++){ ctx.fillStyle='rgba(255,255,255,.6)'; ctx.fillRect(rand(0,W), rand(0,H*0.35), 2, 2); }
+  } else {
+    ctx.fillStyle='#a7d5ff'; ctx.fillRect(0,0,W,H*0.35);
+    ctx.fillStyle='#e3f2fd'; ctx.fillRect(0,H*0.35,W,H*0.05);
+  }
+}
+
 /* Rajzok */
 function drawCrowd(){
-  crowd.forEach((p,i)=>{ const y=p.y + Math.sin((performance.now()/400 + i)*p.s)*2; ctx.fillStyle=p.c; ctx.fillRect(p.x,y,10,10); });
+  crowd.forEach((p,i)=>{
+    const y=p.y + Math.sin((performance.now()/400 + i)*p.s)*2;
+    ctx.fillStyle=p.c; ctx.fillRect(p.x,y,10,10);
+    ctx.fillStyle='rgba(255,255,255,.25)'; ctx.fillRect(p.x+2,y+2,3,3);
+  });
   flags.forEach(f=>{ f.t+=0.08; const wave=Math.sin(f.t)*6; ctx.fillStyle=f.c; ctx.fillRect(f.x,f.y,28,8); ctx.fillRect(f.x+28,f.y+2,10+wave,6); });
 }
 function drawField(){
-  ctx.fillStyle='#4caf50'; ctx.fillRect(0,0,W,H);
+  drawBackdrop();
+  const s = stadiumSel.value; const isNight = night.checked || s==='nightpro';
+  let stripeA='#58b456', stripeB='#4dae52';
+  if(s==='snowfield'){ stripeA='#a5d6a7'; stripeB='#90c69a'; }
+  if(s==='beach'){ stripeA='#e6c88a'; stripeB='#d9bd83'; }
+  if(isNight){ stripeA='#2e5a33'; stripeB='#2a5130'; }
+  for(let i=0;i<8;i++){ ctx.fillStyle = (i%2?stripeA:stripeB); const h = H/8; ctx.fillRect(0, H*0.35 + i*h*0.65/8, W, h*0.65/8); }
   drawCrowd();
-  const gl = (keeper._gl ?? kapu.left-(wideTimer>0?20:0));
-  const gr = (keeper._gr ?? kapu.right+(wideTimer>0?20:0));
-  ctx.strokeStyle='#fff'; ctx.lineWidth=4; ctx.strokeRect(gl,kapu.top,gr-gl,kapu.bottom-kapu.top);
-  const sway=netKick*8; ctx.strokeStyle='#ddd'; ctx.lineWidth=1;
-  for(let x=gl;x<=gr;x+=20){ ctx.beginPath(); ctx.moveTo(x,kapu.top); ctx.lineTo(x+sway*Math.sin((x-gl)/30),kapu.bottom); ctx.stroke(); }
-  for(let y=kapu.top;y<=kapu.bottom;y+=20){ ctx.beginPath(); ctx.moveTo(gl,y); ctx.lineTo(gr,y+sway*Math.sin((y-kapu.top)/28)); ctx.stroke(); }
+  const gl = (keeper._gl ?? kapu.left-(wideTimer>0?20:0)); const gr = (keeper._gr ?? kapu.right+(wideTimer>0?20:0));
+  ctx.save(); ctx.strokeStyle='#fff'; ctx.lineWidth=5; ctx.shadowColor='rgba(0,0,0,.35)'; ctx.shadowBlur=8; ctx.shadowOffsetY=2; ctx.strokeRect(gl,kapu.top,gr-gl,kapu.bottom-kapu.top); ctx.restore();
+  const sway=netKick*10; ctx.strokeStyle=isNight?'#cfd8dc':'#e0e0e0'; ctx.lineWidth=1;
+  for(let x=gl; x<=gr; x+=14){ ctx.beginPath(); ctx.moveTo(x,kapu.top); ctx.lineTo(x + sway*Math.sin((x-gl)/26), kapu.bottom); ctx.stroke(); }
+  for(let y=kapu.top; y<=kapu.bottom; y+=14){ ctx.beginPath(); ctx.moveTo(gl,y); ctx.lineTo(gr, y + sway*Math.sin((y-kapu.top)/22)); ctx.stroke(); }
   ctx.strokeStyle='#fff'; ctx.lineWidth=4; ctx.beginPath(); ctx.arc((gl+gr)/2,kapu.bottom,100,Math.PI,2*Math.PI); ctx.stroke();
+  const v = ctx.createRadialGradient(W/2,H/2,Math.min(W,H)*0.2, W/2,H/2,Math.max(W,H)*0.7);
+  v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, isNight?'rgba(0,0,0,.45)':'rgba(0,0,0,.18)'); ctx.fillStyle=v; ctx.fillRect(0,0,W,H);
+  if(isNight){ const spots=[[80,40],[W-80,40]];
+    spots.forEach(([sx,sy])=>{ const g=ctx.createRadialGradient(sx,sy,2, sx,sy,180);
+      g.addColorStop(0,'rgba(255,255,255,.65)'); g.addColorStop(1,'rgba(255,255,255,0)'); ctx.fillStyle=g; ctx.beginPath(); ctx.arc(sx,sy,180,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='#fff'; ctx.globalAlpha=.9; ctx.beginPath(); ctx.moveTo(sx-6,sy); ctx.lineTo(sx+6,sy); ctx.lineTo(sx,sy-14); ctx.closePath(); ctx.fill(); ctx.globalAlpha=1; });
+  }
+}
+function keeperPalette(){
+  switch(keeperSel.value){
+    case 'red':   return { a:'#ef5350', b:'#e53935', arm:'#c62828' };
+    case 'neon':  return { a:'#76ff03', b:'#43a047', arm:'#2e7d32' };
+    case 'purple':return { a:'#ab47bc', b:'#8e24aa', arm:'#6a1b9a' };
+    case 'retro': return { a:'#ffeb3b', b:'#ffc107', arm:'#f57f17' };
+    default:      return { a:'#42a5f5', b:'#1e88e5', arm:'#1565c0' };
+  }
 }
 function drawKeeper(){
+  const pal = keeperPalette();
   ctx.save();
-  const tilt=keeper.diveT>0?(keeper.vx>0?0.15:-0.15):0;
+  const tilt=keeper.diveT>0?(keeper.vx>0?0.18:-0.18):0;
   ctx.translate(keeper.x+keeper.w/2,keeper.y+keeper.h/2); ctx.rotate(tilt); ctx.translate(-keeper.w/2,-keeper.h/2);
-  ctx.fillStyle='rgba(0,0,0,.15)'; ctx.fillRect(6, keeper.h+6, keeper.w, 10);
-  ctx.fillStyle='#f5c9a3'; ctx.beginPath(); ctx.arc(keeper.w/2,15,15,0,Math.PI*2); ctx.fill(); ctx.strokeStyle='#222'; ctx.stroke();
-  ctx.fillStyle='#1e88e5'; ctx.fillRect(10,30,keeper.w-20,50);
-  ctx.fillStyle='#1565c0'; const arm=keeper.diveT>0?60:40; ctx.fillRect(-2,30,10,arm); ctx.fillRect(keeper.w-8,30,10,arm);
-  ctx.fillStyle='#222'; ctx.fillRect(10,80,12,30); ctx.fillRect(keeper.w-22,80,12,30);
+  ctx.fillStyle='rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(keeper.w/2, keeper.h+10, keeper.w*0.55, 8, 0, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle='#f5c9a3'; ctx.beginPath(); ctx.arc(keeper.w/2,15,15,0,Math.PI*2); ctx.fill(); ctx.strokeStyle='#333'; ctx.stroke();
+  const mg=ctx.createLinearGradient(0,30,0,80); mg.addColorStop(0, pal.a); mg.addColorStop(1, pal.b);
+  ctx.fillStyle=mg; ctx.fillRect(10,30,keeper.w-20,50);
+  ctx.fillStyle=pal.arm; const arm=keeper.diveT>0?60:40; ctx.fillRect(-2,30,10,arm); ctx.fillRect(keeper.w-8,30,10,arm);
+  ctx.fillStyle='#263238'; ctx.fillRect(10,80,12,30); ctx.fillRect(keeper.w-22,80,12,30);
   ctx.restore();
 }
 function drawBall(){
-  const g=ctx.createRadialGradient(ball.x-5,ball.y-5,5,ball.x,ball.y,ball.r); g.addColorStop(0,'#fff'); g.addColorStop(1,'#999'); ctx.fillStyle=g;
-  ctx.beginPath(); ctx.arc(ball.x,ball.y,ball.r,0,Math.PI*2); ctx.fill(); ctx.strokeStyle='#444'; ctx.stroke();
-  ctx.fillStyle= ball.super ? '#ffea00' : '#000';
+  if(ball.moving){ trail.push({x:ball.x, y:ball.y, a:1}); if(trail.length>14) trail.shift(); } else trail.length=0;
+  for(let i=0;i<trail.length;i++){ const t=trail[i]; ctx.fillStyle=`rgba(255,255,255,${0.06*t.a})`; ctx.beginPath(); ctx.arc(t.x,t.y, ball.r+6*i/trail.length, 0, Math.PI*2); ctx.fill(); t.a*=0.92; }
+  const g=ctx.createRadialGradient(ball.x-6,ball.y-7,4, ball.x,ball.y,ball.r); g.addColorStop(0,'#fff'); g.addColorStop(1,'#bdbdbd');
+  ctx.fillStyle=g; ctx.beginPath(); ctx.arc(ball.x,ball.y,ball.r,0,Math.PI*2); ctx.fill(); ctx.strokeStyle='#444'; ctx.stroke();
+  ctx.fillStyle= ball.super ? '#ffea00' : '#222';
   ctx.beginPath(); ctx.moveTo(ball.x-7,ball.y-5); ctx.lineTo(ball.x-2,ball.y+2); ctx.lineTo(ball.x+2,ball.y-2); ctx.closePath(); ctx.fill();
+  ctx.save(); ctx.globalAlpha=.25; ctx.fillStyle='#000'; ctx.beginPath(); ctx.ellipse(ball.x+6, ball.y+ball.r-2, ball.r*0.9, ball.r*0.45, 0, 0, Math.PI*2); ctx.fill(); ctx.restore();
 }
 function drawGuide(){
   if(ball.moving || !guideChk.checked) return;
-  // vezetővonal
+
+  // alap célkereszt
   ctx.strokeStyle='rgba(255,255,255,.85)'; ctx.lineWidth=2;
   ctx.beginPath(); ctx.moveTo(ball.x,ball.y); ctx.lineTo(aim.x,aim.y); ctx.stroke();
-  // célkereszt
   ctx.save(); ctx.translate(aim.x, aim.y);
   ctx.strokeStyle='rgba(255,255,255,.95)'; ctx.lineWidth=2;
   ctx.beginPath(); ctx.arc(0,0,10,0,Math.PI*2); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(-14,0); ctx.lineTo(14,0); ctx.moveTo(0,-14); ctx.lineTo(0,14); ctx.stroke();
   ctx.restore();
+
+  // Pro ív
+  if(proGuide.checked){
+    const path = predictPath();
+    ctx.setLineDash([6,6]);
+    ctx.strokeStyle='rgba(0,255,200,.9)'; ctx.lineWidth=2;
+    ctx.beginPath();
+    for(let i=0;i<path.length;i++){
+      const p=path[i];
+      if(i===0) ctx.moveTo(p.x,p.y); else ctx.lineTo(p.x,p.y);
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
 }
 function drawWeather(){
   if(weather==='rain'){ ctx.strokeStyle='rgba(255,255,255,.6)'; ctx.lineWidth=1; rain.forEach(d=>{ ctx.beginPath(); ctx.moveTo(d.x,d.y); ctx.lineTo(d.x-3,d.y+8); ctx.stroke(); }); }
@@ -215,32 +385,29 @@ function drawHUD(){
   ctx.fillStyle='#fff'; ctx.font='20px Arial';
   ctx.fillText(`Pont: ${score}`, 20, 34);
   ctx.fillText(`Szint: ${level}`, 20, 60);
-  ctx.fillText('Verzió: v4-pwa', 720, 34);
+  ctx.fillText('Verzió: v8-targets-combo-aim', 570, 34);
 }
 
-/* Konfetti */
+/* Konfetti + effekt */
 function spawnConfetti(x,y,n=35){ for(let i=0;i<n;i++){ confetti.push({x,y,vx:rand(-3,3),vy:rand(-5,-1),g:rand(0.12,0.2),life:rand(30,60),c:`hsl(${Math.floor(Math.random()*360)} 90% 60%)`}); } }
 function stepConfetti(){ for(let i=confetti.length-1;i>=0;i--){ const p=confetti[i]; p.x+=p.vx; p.y+=p.vy; p.vy+=p.g; p.life--; if(p.life<=0) confetti.splice(i,1); } }
 function drawConfetti(){ confetti.forEach(p=>{ ctx.fillStyle=p.c; ctx.fillRect(p.x,p.y,4,4); }); }
 
 /* Rázkódás */
-let shakeT=0, shakeMag=0;
-function startShake(time=12,mag=6){ if(!shakeChk.checked) return; shakeT=time; shakeMag=mag; if(navigator.vibrate) try{navigator.vibrate(40);}catch(e){} }
+let shakeT=0;
+function startShake(time=12,mag=6){ if(!shakeChk.checked) return; shakeT=time; if(navigator.vibrate) try{navigator.vibrate(40);}catch(e){} }
 
-/* Kapus AI + nehézség */
+/* Kapus AI */
 function keeperAI(){
-  const diffMul = 0.6 + (Number(diff.value)-1)*0.25; // 1..5 → 0.6..1.6
+  const diffMul = 0.6 + (Number(diff.value)-1)*0.25;
   keeper.x += keeper.vx;
-
   const widen = (wideTimer>0?20:0);
-  const shrink = (Number(diff.value)-3)*8; // 3=0, 5=+16 (szűkebb)
+  const shrink = (Number(diff.value)-3)*8;
   const gl = kapu.left - widen + shrink;
   const gr = kapu.right + widen - shrink;
-
   if(keeper.x<=gl || keeper.x+keeper.w>=gr) keeper.vx*=-1;
   if(Math.random()<0.01) keeper.vx*=-1;
   if(Math.random()<0.01) keeper.vx*=(Math.random()<.5?0.7:1.3);
-
   if(keeper.reactDelay>0){ keeper.reactDelay--; }
   else if(ball.moving && ball.y<260 && keeper.diveT<=0){
     keeper.reactDelay = Math.floor(Math.random()*9)+5;
@@ -252,7 +419,6 @@ function keeperAI(){
   if(keeper.diveT>0) keeper.diveT--;
   const vmax=(slowTimer>0?0.6:1) * (4 + (level-1)*1.3) * diffMul;
   keeper.vx = clamp(keeper.vx, -vmax*1.8, vmax*1.8);
-
   keeper._gl = gl; keeper._gr = gr;
 }
 
@@ -288,47 +454,138 @@ function showBanner(text, ms=800){
   setTimeout(()=>{ banner.style.opacity='0'; banner.style.transform='translateX(-50%) scale(1)'; }, ms);
 }
 
-/* Timer & szint/pont */
-function resetRound(startTimer=false){
-  score=0; level=1; ball.moving=false; ball.super=false;
-  ball.x=W/2; ball.y=H-60; aim.x=ball.x; aim.y=ball.y-350;
-  keeper.x=375; keeper.vx=4; keeper.diveT=0; keeper.reactDelay=0;
-  powerups.length=0; confetti.length=0; netKick=0; wideTimer=0; slowTimer=0;
-  randomizeWind(); setupWeather();
-  updateStats();
-  if(startTimer){ mode='timed'; modeSel.value='timed'; timeLeft=60; timerOn=true; tickTimer(); }
-  else{ mode='normal'; modeSel.value='normal'; timerOn=false; tEl.textContent=''; }
+/* ===== Bajnokság mód ===== */
+let champ = { match:1, my:0, ai:0, target:3, bestOf:5, active:false, finished:false };
+function startChamp(){
+  champ = { match:1, my:0, ai:0, target:3, bestOf:5, active:true, finished:false };
+  level=1; diff.value=3; updateChampHint();
 }
-function tickTimer(){ if(!timerOn) return; tEl.textContent=`• Idő: ${timeLeft}s`; if(timeLeft<=0){ timerOn=false; alert(`⏱️ Idő lejárt! Pont: ${score}`); saveHi(); return; } setTimeout(()=>{ timeLeft--; tickTimer(); },1000); }
-function saveHi(){ if(score>hiscore){ hiscore=score; localStorage.setItem(HS_KEY, hiscore);} }
-function levelUp(){ if(score>0 && score%5===0 && level<maxLevel){ level++; if(AC&&sndChk.checked) sLevel(); alert(`Gratulálok! Szint ${level}.`); randomizeWind(); } }
+function updateChampHint(){
+  if(!champ.active){ tEl.textContent=''; return; }
+  tEl.textContent = `• Bajnokság: Meccs ${champ.match}/${champ.bestOf} • Állás ${champ.my}:${champ.ai} (cél: ${champ.target})`;
+}
+function goalForMe(){ if(!champ.active) return; champ.my++; if(champ.my>=champ.target) endMatch(true); else updateChampHint(); }
+function goalForAI(){ if(!champ.active) return; champ.ai++; if(champ.ai>=champ.target) endMatch(false); else updateChampHint(); }
+function endMatch(won){
+  showBanner(won?'MECCS NYERT! 🏅':'MECCS ELVESZTVE 😬', 1200);
+  if(won){ level++; diff.value = Math.min(5, Number(diff.value)+1); }
+  champ.match++;
+  if(champ.match>champ.bestOf){ cup.classList.add('show'); cup.style.pointerEvents='auto'; champ.active=false; champ.finished=true; }
+  else{ champ.my=0; champ.ai=0; randomizeWind(); setupWeather(); resetKickSpot(); updateChampHint(); }
+}
+cup.addEventListener('click', ()=>{
+  cup.classList.remove('show'); cup.style.pointerEvents='none';
+  modeSel.value='normal'; mode='normal'; resetRound(false);
+});
+
+/* Pontozás */
+function addScore(points){
+  const gained = points * comboMult();
+  score += gained; scEl.textContent=score;
+  if(score>hiscore){ hiscore=score; localStorage.setItem(HS_KEY,hiscore); hiEl.textContent=hiscore; }
+}
+
+/* Timer & reset */
+function resetRound(startTimer=false){
+  score=0; level=1; ball.moving=false; ball.super=false; ball.spin=0; ball.type=shotSel.value; ball.bounces=0;
+  resetKickSpot(); keeper.x=375; keeper.vx=4; keeper.diveT=0; keeper.reactDelay=0;
+  powerups.length=0; confetti.length=0; netKick=0; wideTimer=0; slowTimer=0; replay.frames.length=0;
+  randomizeWind(); setupWeather(); resetCombo(); targets.length=0;
+  updateStats(); updateChampHint();
+  if(startTimer){ mode='timed'; modeSel.value='timed'; timeLeft=60; timerOn=true; tickTimer(); }
+  else if(modeSel.value==='champ'){ mode='champ'; startChamp(); }
+  else if(modeSel.value==='targets'){ mode='targets'; spawnTargets(3); timeLeft=45; timerOn=true; tickTimer(); }
+  else{ mode='normal'; timerOn=false; tEl.textContent=''; }
+}
+function resetKickSpot(){ ball.x=W/2; ball.y=H-60; aim.x=ball.x; aim.y=ball.y-350; }
+function tickTimer(){ if(!timerOn) return; tEl.textContent=`• Idő: ${timeLeft}s`; if(timeLeft<=0){ timerOn=false; alert(`⏱️ Idő lejárt! Pont: ${score}`); return; } setTimeout(()=>{ timeLeft--; tickTimer(); },1000); }
 function updateStats(){ lvEl.textContent=level; scEl.textContent=score; hiEl.textContent=hiscore; }
 
-/* Labda mozgás + ütközések */
+/* Labda fizika + találatok */
 function stepBall(){
   if(!ball.moving) return;
-  ball.vx += wind.x * 0.05;
+  ball.vx += wind.x * 0.06;
+  if(ball.type==='curve'){ ball.vx += 0.06 * Math.sign(ball.spin||1); }
+  if(ball.type==='knuckle'){ ball.vx += (Math.random()*0.6-0.3)*0.25; ball.vy += (Math.random()*0.6-0.3)*0.15; }
+  if(ball.type==='bounce'){ if(ball.bounces<1 && ball.y>H-40){ ball.vy*=-0.75; ball.vx*=0.98; ball.bounces++; } }
   ball.x += ball.vx; ball.y += ball.vy;
-  const gl=(keeper._gl ?? kapu.left-(wideTimer>0?20:0));
-  const gr=(keeper._gr ?? kapu.right+(wideTimer>0?20:0));
-  if(!ball.super && circleRectCollide(ball.x,ball.y,ball.r, keeper.x,keeper.y,keeper.w,keeper.h)){
+
+  const gl=(keeper._gl ?? kapu.left-(wideTimer>0?20:0)), gr=(keeper._gr ?? kapu.right+(wideTimer>0?20:0));
+
+  // Target találat
+  if(mode==='targets'){
+    for(const t of targets){
+      if(!t.alive) continue;
+      const dx=ball.x-t.x, dy=ball.y-t.y;
+      if(dx*dx+dy*dy <= (ball.r + t.r)* (ball.r + t.r)){
+        t.alive=false;
+        addScore(2); // target 2 pont * kombó
+        successCombo();
+        spawnConfetti(t.x,t.y,28);
+        showBanner(`TARGET! +${2*comboMult()}`, 700);
+      }
+    }
+  }
+
+  // kapus védés
+  if(!ball.super && circleRectCollide(ball.x,ball.y,ball.r, keeper.x,keeper.y,keeper.w,keeper.h) && mode!=='targets'){
     ball.moving=false; if(AC&&sndChk.checked) sSave(); showBanner('VÉDÉS! 🧤', 700);
-    ball.x=W/2; ball.y=H-60; aim.x=ball.x; aim.y=ball.y-350; return;
+    if(mode==='champ') goalForAI(); resetKickSpot(); resetCombo(); replayStart(); return;
   }
-  if(ball.y - ball.r <= kapu.top && ball.x >= gl && ball.x <= gr){
-    ball.moving=false; score++; saveHi(); levelUp(); updateStats();
+
+  // gól
+  if(ball.y - ball.r <= kapu.top && ball.x >= gl && ball.x <= gr && mode!=='targets'){
+    ball.moving=false; addScore(1); successCombo();
     if(AC&&sndChk.checked) sGoal();
-    netKick=1; spawnConfetti(ball.x, kapu.top+10, 35); startShake(12,6); showBanner('GOOOL! 🎉');
+    netKick=1; spawnConfetti(ball.x, kapu.top+10, 35); startShake(12,6); showBanner(`GOOOL! +${1*comboMult()} 🎉`);
     shareBtn.style.display='inline-block';
-    ball.x=W/2; ball.y=H-60; aim.x=ball.x; aim.y=ball.y-350; return;
+    if(mode==='champ') goalForMe();
+    resetKickSpot(); replayStart(); return;
   }
+
+  // kimegy
   if(ball.y + ball.r < 0 || ball.y - ball.r > H || ball.x + ball.r < 0 || ball.x - ball.r > W){
     ball.moving=false; if(AC&&sndChk.checked) sSave(); showBanner('MELLÉ! 😬', 600);
-    ball.x=W/2; ball.y=H-60; aim.x=ball.x; aim.y=ball.y-350;
+    if(mode==='champ') goalForAI();
+    resetKickSpot(); resetCombo(); replayStart();
   }
 }
 
-/* Drag lövés (egér + érintés) */
+/* Pro irányvonal – szimuláció */
+function predictPath(){
+  // ha nincs erő, ne számoljunk
+  const dx=aim.x-ball.x, dy=aim.y-ball.y;
+  const len=Math.hypot(dx,dy);
+  if(len<10) return [];
+  const sp = 6 + (power/powerMax)*14;
+  let vx = (dx/len)*sp;
+  let vy = (dy/len)*sp;
+  const type = shotSel.value;
+  const spin = (type==='curve') ? (aim.x<ball.x ? -1 : 1) : 0;
+
+  const pts=[];
+  let px=ball.x, py=ball.y;
+  let bounces=0;
+  for(let i=0;i<120;i++){
+    // szél
+    vx += wind.x * 0.06;
+    // típus
+    if(type==='curve'){ vx += 0.06 * Math.sign(spin||1); }
+    if(type==='bounce'){
+      if(bounces<1 && py>H-40){ vy*=-0.75; vx*=0.98; bounces++; }
+    }
+    // poz frissítés
+    px += vx; py += vy;
+    pts.push({x:px,y:py});
+    // kilépés a vászonról
+    if(px<-50||px>W+50||py<-50||py>H+50) break;
+    // ha elérte kb. a kapu felső vonalát, megállunk (csak vizuál)
+    if(py <= kapu.top-5) break;
+  }
+  return pts;
+}
+
+/* Drag lövés */
 function getPos(e){
   const r=cvs.getBoundingClientRect();
   const cx=(e.touches?e.touches[0].clientX:e.clientX)-r.left;
@@ -336,6 +593,7 @@ function getPos(e){
   return { x: cx*(cvs.width/r.width), y: cy*(cvs.height/r.height) };
 }
 function startDrag(p){
+  if(replay.playing) { replayStop(); return; }
   if(ball.moving) return;
   if(Math.hypot(p.x-ball.x,p.y-ball.y) <= ball.r+28){
     dragging=true; dragStart={x:p.x,y:p.y}; power=0; pBar.style.width='0%';
@@ -357,6 +615,10 @@ function endDrag(){
   if(!dragging) return; dragging=false; if(power<2) return;
   const dx=aim.x-ball.x, dy=aim.y-ball.y, d=Math.hypot(dx,dy)||1;
   const sp = 6 + (power/powerMax)*14;
+
+  ball.type = shotSel.value; ball.bounces = 0;
+  ball.spin = (ball.type==='curve') ? (aim.x<ball.x ? -1 : 1) : 0;
+
   ball.vx=(dx/d)*sp; ball.vy=(dy/d)*sp; ball.moving=true; if(AC&&sndChk.checked) sKick();
   power=0; pBar.style.width='0%';
 }
@@ -384,8 +646,18 @@ shareBtn.addEventListener('click', async ()=>{
 
 /* Fő ciklus */
 function update(){
-  keeperAI();
+  if(replay.playing){
+    replay.ptr += replay.speed;
+    if(replay.ptr >= replay.frames.length){ replayStop(); }
+    return;
+  }
+  if(mode!=='targets') keeperAI();
   stepBall();
+  if(mode==='targets'){
+    stepTargets();
+    // ha minden target kiesett, újak
+    if(targets.every(t=>!t.alive)) spawnTargets(3);
+  }
   stepPowerUps();
   stepConfetti();
   stepWeather();
@@ -394,11 +666,22 @@ function update(){
   if(wideTimer>0) wideTimer--;
   if(slowTimer>0) slowTimer--;
   spawnPowerUp();
+  replayCapture();
 }
 function render(){
   ctx.save();
   if(shakeT>0){ ctx.translate((Math.random()*2-1)*6, (Math.random()*2-1)*6); }
-  drawField(); drawKeeper(); drawPowerUps(); drawBall(); drawGuide(); drawWeather(); drawConfetti(); drawHUD();
+
+  drawField();
+  if(mode!=='targets') drawKeeper();
+  drawPowerUps();
+  if(mode==='targets') drawTargets();
+  drawBall();
+  drawGuide();
+  drawWeather();
+  drawConfetti();
+  drawHUD();
+
   ctx.restore();
 }
 function loop(){ update(); render(); requestAnimationFrame(loop); }
@@ -415,12 +698,12 @@ muteBtn.addEventListener('click', ()=>{
 });
 </script>
 
-<!-- PWA service worker regisztráció — új név + cache-buster -->
+<!-- PWA SW regisztráció (új név + cache-buster) -->
 <script>
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./service-worker-v4.js?v=1', { scope: './' })
-        .then(reg => console.log('SW reg ok (v4):', reg.scope))
+      navigator.serviceWorker.register('./service-worker-v8.js?v=1', { scope: './' })
+        .then(reg => console.log('SW reg ok (v8):', reg.scope))
         .catch(err => console.warn('SW reg hiba:', err));
     });
   }
