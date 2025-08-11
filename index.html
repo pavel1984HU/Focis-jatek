@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>KickSpark • Focis Mini Játék (© Adrián)</title>
 
-<!-- Manifest maradhat, SW nélkül is oké -->
+<!-- PWA -->
 <link rel="manifest" href="./manifest.json">
 <meta name="theme-color" content="#4caf50">
 <link rel="icon" href="./icons/icon-192.png" sizes="192x192">
@@ -33,21 +33,30 @@
   #hint{font-size:14px;margin-top:4px;opacity:.9}
   #signature{position:fixed;right:10px;bottom:10px;font-size:14px;color:rgba(255,255,255,.85);font-style:italic;pointer-events:none;text-shadow:0 0 3px rgba(0,0,0,.5);animation:pulse 3s ease-in-out infinite}
   @keyframes pulse{0%{opacity:.1}50%{opacity:.75}100%{opacity:.1}}
-  @media(max-width:520px){h1{font-size:18px} button,select,label{font-size:15px}}
-  #diag{position:fixed;left:8px;top:8px;background:#0008;color:#fff;padding:6px 8px;border-radius:6px;font:12px/1.2 Arial;z-index:9999}
+  @media(max-width:520px){
+    h1{font-size:18px}
+    #controls button,#controls select,#controls label{padding:12px 16px;font-size:17px}
+    #powerWrap{left:8px;bottom:8px;width:65%}
+  }
+  /* Banner (gól/védés) */
+  #banner{position:absolute;left:50%;top:12%;transform:translateX(-50%);
+    padding:8px 14px;background:#000a;color:#fff;border-radius:10px;backdrop-filter:blur(2px);
+    font-weight:700;opacity:0;transition:opacity .2s, transform .2s;pointer-events:none}
 </style>
 </head>
 <body>
   <div id="wrap">
     <h1>⚽ KickSpark – Weather + PowerUps (© Adrián)
       <small style="font-size:14px; margin-left:8px; opacity:.9; background:#fff2; padding:2px 6px; border-radius:6px;">
-        VERZIÓ: v3-keeper
+        VERZIÓ: v4-pwa
       </small>
     </h1>
     <div style="position:relative">
       <canvas id="game" width="900" height="500"></canvas>
       <div id="powerWrap"><div id="powerBar"></div></div>
+      <div id="banner">GOOOL! 🎉</div>
     </div>
+
     <div id="controls">
       <button id="shootBtn" title="Rúgás (Space)">Lőj!</button>
       <button id="resetBtn">Újrakezd</button>
@@ -61,6 +70,16 @@
         <option value="snow">Hó</option>
         <option value="random" selected>Véletlen</option>
       </select>
+
+      <!-- Nehézség csúszka -->
+      <label style="display:flex;gap:6px;align-items:center">
+        Nehézség
+        <input id="diff" type="range" min="1" max="5" step="1" value="3" style="width:120px">
+      </label>
+
+      <!-- Hang ki/be -->
+      <button id="muteBtn" title="Hang ki/be">🔊</button>
+
       <span id="stats">Szint: <b id="lv">1</b> • Pont: <b id="sc">0</b> • Rekord: <b id="hi">0</b> <span id="tLeft"></span></span>
       <div id="panel">
         <label><input type="checkbox" id="snd" checked> Hang</label>
@@ -69,11 +88,10 @@
       </div>
       <button id="shareBtn">Megosztás</button>
     </div>
+
     <div id="hint">Húzd vissza a labdát (drag) → engedd el. Hosszabb húzás = erősebb rúgás. 🎯</div>
   </div>
   <div id="signature">© Adrián</div>
-
-<div id="diag">Töltés…</div>
 
 <script>
 /* ===== Állapot és UI ===== */
@@ -83,7 +101,7 @@ const shootBtn=document.getElementById('shootBtn'), resetBtn=document.getElement
 const modeSel=document.getElementById('modeSel'), weatherSel=document.getElementById('weatherSel');
 const sndChk=document.getElementById('snd'), shakeChk=document.getElementById('shake'), guideChk=document.getElementById('guide');
 const lvEl=document.getElementById('lv'), scEl=document.getElementById('sc'), hiEl=document.getElementById('hi'), tEl=document.getElementById('tLeft');
-const pBar=document.getElementById('powerBar');
+const pBar=document.getElementById('powerBar'); const diff=document.getElementById('diff'); const muteBtn=document.getElementById('muteBtn'); const banner=document.getElementById('banner');
 
 let score=0, level=1, maxLevel=5;
 const HS_KEY='kickspark_hi_v1';
@@ -113,7 +131,7 @@ let netKick=0;
 const confetti=[];
 
 /* Kapus + vetődés */
-const keeper={x:375,y:90,w:60,h:60,vx:4,diveT:0,targetX:null,reactDelay:0};
+const keeper={x:375,y:90,w:60,h:60,vx:4,diveT:0,targetX:null,reactDelay:0,_gl:null,_gr:null};
 
 /* Power-upok */
 const powerups=[]; const PU_TYPES=['SUPER','SLOW','WIDE'];
@@ -122,7 +140,7 @@ let wideTimer=0, slowTimer=0;
 
 /* Hangok (WebAudio) */
 const AC=(window.AudioContext||window.webkitAudioContext)?new (window.AudioContext||window.webkitAudioContext)():null;
-function bip(f=660,d=.08,t='square',v=.08){ if(!sndChk.checked||!AC) return; const o=AC.createOscillator(), g=AC.createGain(); o.type=t; o.frequency.value=f; g.gain.value=v; o.connect(g); g.connect(AC.destination); o.start(); o.stop(AC.currentTime+d); }
+function bip(f=660,d=.08,t='square',v=.08){ if(!sndChk.checked||!AC) return; const o=AC.createOscillator(), g=AC.createGain(); o.type=t; o.frequency.value=f; g.gain.value=v; o.connect(g); g.connect(AC.destination); if(AC.state==='suspended') AC.resume().catch(()=>{}); o.start(); o.stop(AC.currentTime+d); }
 const sKick=()=>bip(660,.06,'square',.09), sGoal=()=>{bip(880,.10,'sine',.10); setTimeout(()=>bip(1320,.08,'sine',.08),90)}, sSave=()=>bip(220,.10,'triangle',.10), sLevel=()=>bip(1200,.12,'sine',.09), sPU=()=>bip(980,.08,'square',.08);
 
 /* Időjárás */
@@ -148,7 +166,8 @@ function drawCrowd(){
 function drawField(){
   ctx.fillStyle='#4caf50'; ctx.fillRect(0,0,W,H);
   drawCrowd();
-  const gl=kapu.left-(wideTimer>0?20:0), gr=kapu.right+(wideTimer>0?20:0);
+  const gl = (keeper._gl ?? kapu.left-(wideTimer>0?20:0));
+  const gr = (keeper._gr ?? kapu.right+(wideTimer>0?20:0));
   ctx.strokeStyle='#fff'; ctx.lineWidth=4; ctx.strokeRect(gl,kapu.top,gr-gl,kapu.bottom-kapu.top);
   const sway=netKick*8; ctx.strokeStyle='#ddd'; ctx.lineWidth=1;
   for(let x=gl;x<=gr;x+=20){ ctx.beginPath(); ctx.moveTo(x,kapu.top); ctx.lineTo(x+sway*Math.sin((x-gl)/30),kapu.bottom); ctx.stroke(); }
@@ -174,9 +193,15 @@ function drawBall(){
 }
 function drawGuide(){
   if(ball.moving || !guideChk.checked) return;
-  ctx.strokeStyle='rgba(255,255,255,.9)'; ctx.lineWidth=2;
+  // vezetővonal
+  ctx.strokeStyle='rgba(255,255,255,.85)'; ctx.lineWidth=2;
   ctx.beginPath(); ctx.moveTo(ball.x,ball.y); ctx.lineTo(aim.x,aim.y); ctx.stroke();
-  ctx.fillStyle='rgba(255,255,255,.9)'; ctx.beginPath(); ctx.arc(aim.x,aim.y,5,0,Math.PI*2); ctx.fill();
+  // célkereszt
+  ctx.save(); ctx.translate(aim.x, aim.y);
+  ctx.strokeStyle='rgba(255,255,255,.95)'; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.arc(0,0,10,0,Math.PI*2); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(-14,0); ctx.lineTo(14,0); ctx.moveTo(0,-14); ctx.lineTo(0,14); ctx.stroke();
+  ctx.restore();
 }
 function drawWeather(){
   if(weather==='rain'){ ctx.strokeStyle='rgba(255,255,255,.6)'; ctx.lineWidth=1; rain.forEach(d=>{ ctx.beginPath(); ctx.moveTo(d.x,d.y); ctx.lineTo(d.x-3,d.y+8); ctx.stroke(); }); }
@@ -190,7 +215,7 @@ function drawHUD(){
   ctx.fillStyle='#fff'; ctx.font='20px Arial';
   ctx.fillText(`Pont: ${score}`, 20, 34);
   ctx.fillText(`Szint: ${level}`, 20, 60);
-  ctx.fillText('Verzió: v3-keeper', 700, 34);
+  ctx.fillText('Verzió: v4-pwa', 720, 34);
 }
 
 /* Konfetti */
@@ -202,24 +227,33 @@ function drawConfetti(){ confetti.forEach(p=>{ ctx.fillStyle=p.c; ctx.fillRect(p
 let shakeT=0, shakeMag=0;
 function startShake(time=12,mag=6){ if(!shakeChk.checked) return; shakeT=time; shakeMag=mag; if(navigator.vibrate) try{navigator.vibrate(40);}catch(e){} }
 
-/* Kapus AI */
+/* Kapus AI + nehézség */
 function keeperAI(){
-  keeper.x+=keeper.vx;
-  const gl=kapu.left-(wideTimer>0?20:0), gr=kapu.right+(wideTimer>0?20:0);
+  const diffMul = 0.6 + (Number(diff.value)-1)*0.25; // 1..5 → 0.6..1.6
+  keeper.x += keeper.vx;
+
+  const widen = (wideTimer>0?20:0);
+  const shrink = (Number(diff.value)-3)*8; // 3=0, 5=+16 (szűkebb)
+  const gl = kapu.left - widen + shrink;
+  const gr = kapu.right + widen - shrink;
+
   if(keeper.x<=gl || keeper.x+keeper.w>=gr) keeper.vx*=-1;
   if(Math.random()<0.01) keeper.vx*=-1;
   if(Math.random()<0.01) keeper.vx*=(Math.random()<.5?0.7:1.3);
-  if(keeper.reactDelay>0){ keeper.reactDelay--; return; }
-  if(ball.moving && ball.y<260 && keeper.diveT<=0){
+
+  if(keeper.reactDelay>0){ keeper.reactDelay--; }
+  else if(ball.moving && ball.y<260 && keeper.diveT<=0){
     keeper.reactDelay = Math.floor(Math.random()*9)+5;
     keeper.targetX = clamp(ball.x + rand(-40,40) - keeper.w/2, gl, gr-keeper.w);
-    const speed = (slowTimer>0?0.6:1) * (4 + (level-1)*1.4);
-    keeper.vx = (keeper.targetX > keeper.x ? 1:-1) * speed * 1.6;
+    const base = (4 + (level-1)*1.4);
+    keeper.vx = (keeper.targetX > keeper.x ? 1:-1) * base * 1.6 * diffMul;
     keeper.diveT = 28;
   }
   if(keeper.diveT>0) keeper.diveT--;
-  const vmax=(slowTimer>0?0.6:1) * (4 + (level-1)*1.3);
+  const vmax=(slowTimer>0?0.6:1) * (4 + (level-1)*1.3) * diffMul;
   keeper.vx = clamp(keeper.vx, -vmax*1.8, vmax*1.8);
+
+  keeper._gl = gl; keeper._gr = gr;
 }
 
 /* Power-upok */
@@ -246,6 +280,14 @@ function stepPowerUps(){
   }
 }
 
+/* Banner */
+function showBanner(text, ms=800){
+  banner.textContent = text;
+  banner.style.opacity='1';
+  banner.style.transform='translateX(-50%) scale(1.03)';
+  setTimeout(()=>{ banner.style.opacity='0'; banner.style.transform='translateX(-50%) scale(1)'; }, ms);
+}
+
 /* Timer & szint/pont */
 function resetRound(startTimer=false){
   score=0; level=1; ball.moving=false; ball.super=false;
@@ -267,20 +309,21 @@ function stepBall(){
   if(!ball.moving) return;
   ball.vx += wind.x * 0.05;
   ball.x += ball.vx; ball.y += ball.vy;
-  const gl=kapu.left-(wideTimer>0?20:0), gr=kapu.right+(wideTimer>0?20:0);
+  const gl=(keeper._gl ?? kapu.left-(wideTimer>0?20:0));
+  const gr=(keeper._gr ?? kapu.right+(wideTimer>0?20:0));
   if(!ball.super && circleRectCollide(ball.x,ball.y,ball.r, keeper.x,keeper.y,keeper.w,keeper.h)){
-    ball.moving=false; if(AC&&sndChk.checked) sSave();
+    ball.moving=false; if(AC&&sndChk.checked) sSave(); showBanner('VÉDÉS! 🧤', 700);
     ball.x=W/2; ball.y=H-60; aim.x=ball.x; aim.y=ball.y-350; return;
   }
   if(ball.y - ball.r <= kapu.top && ball.x >= gl && ball.x <= gr){
     ball.moving=false; score++; saveHi(); levelUp(); updateStats();
     if(AC&&sndChk.checked) sGoal();
-    netKick=1; spawnConfetti(ball.x, kapu.top+10, 35); startShake(12,6);
+    netKick=1; spawnConfetti(ball.x, kapu.top+10, 35); startShake(12,6); showBanner('GOOOL! 🎉');
     shareBtn.style.display='inline-block';
     ball.x=W/2; ball.y=H-60; aim.x=ball.x; aim.y=ball.y-350; return;
   }
   if(ball.y + ball.r < 0 || ball.y - ball.r > H || ball.x + ball.r < 0 || ball.x - ball.r > W){
-    ball.moving=false; if(AC&&sndChk.checked) sSave();
+    ball.moving=false; if(AC&&sndChk.checked) sSave(); showBanner('MELLÉ! 😬', 600);
     ball.x=W/2; ball.y=H-60; aim.x=ball.x; aim.y=ball.y-350;
   }
 }
@@ -354,14 +397,8 @@ function update(){
 }
 function render(){
   ctx.save();
-  drawField();
-  drawKeeper();         /* FONTOS: kapus kirajzolása */
-  drawPowerUps();
-  drawBall();
-  drawGuide();
-  drawWeather();
-  drawConfetti();
-  drawHUD();
+  if(shakeT>0){ ctx.translate((Math.random()*2-1)*6, (Math.random()*2-1)*6); }
+  drawField(); drawKeeper(); drawPowerUps(); drawBall(); drawGuide(); drawWeather(); drawConfetti(); drawHUD();
   ctx.restore();
 }
 function loop(){ update(); render(); requestAnimationFrame(loop); }
@@ -370,13 +407,23 @@ function loop(){ update(); render(); requestAnimationFrame(loop); }
 function init(){ setupWeather(); resetRound(false); loop(); }
 init();
 
-/* Diagnosztika: jelezze, hogy a kapus kód él-e */
-setInterval(()=>{ 
-  const ok = (typeof keeper!=='undefined') && keeper && typeof drawKeeper==='function';
-  document.getElementById('diag').textContent = 'Kapus kód: ' + (ok?'OK':'HIÁNYZIK');
-}, 800);
+/* Mute gomb */
+muteBtn.addEventListener('click', ()=>{
+  sndChk.checked = !sndChk.checked;
+  muteBtn.textContent = sndChk.checked ? '🔊' : '🔇';
+  if (sndChk.checked && AC && AC.state==='suspended') AC.resume().catch(()=>{});
+});
 </script>
 
-<!-- NINCS service worker regisztráció -->
+<!-- PWA service worker regisztráció — új név + cache-buster -->
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./service-worker-v4.js?v=1', { scope: './' })
+        .then(reg => console.log('SW reg ok (v4):', reg.scope))
+        .catch(err => console.warn('SW reg hiba:', err));
+    });
+  }
+</script>
 </body>
 </html>
